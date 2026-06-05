@@ -1,0 +1,53 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  passwordHash String
+  role      String   // Admin, Manager, Staff
+  status    String   // Active, Inactive
+  lastLogin DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Location {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  address   String
+  manager   String
+  phone     String
+  itemCount Int      @default(0)
+  items     InventoryItem[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model InventoryItem {
+  id             String   @id @default(uuid())
+  name           String
+  category       String
+  targetCustomer String   // Male, Female, Unisex
+  subcategory    String
+  size           String
+  condition      String   // Excellent, Good, Fair, Damaged
+  quantity       Int      @default(0)
+  price          Float    @default(0.0)
+  dateAdded      DateTime @default(now())
+  locationId     String
+  location       Location @relation(fields: [locationId], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
