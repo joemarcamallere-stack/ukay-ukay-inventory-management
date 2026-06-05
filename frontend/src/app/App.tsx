@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Search, ChevronRight, ChevronDown, Folder, FolderOpen, LayoutDashboard, AlertTriangle, Package, PackagePlus, ShoppingCart, PackageCheck, Layers, ArrowRightLeft, MapPin, FileText, Users, LogOut, X, Eye, TrendingUp, TrendingDown, RefreshCw, CreditCard, CheckCircle } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, ChevronRight, ChevronDown, Folder, FolderOpen, LayoutDashboard, AlertTriangle, Package, PackagePlus, ShoppingCart, PackageCheck, Layers, ArrowRightLeft, MapPin, FileText, Users, LogOut, X, Eye, TrendingUp, TrendingDown, RefreshCw, CreditCard, CheckCircle, ChefHat, ClipboardList, Utensils, Ban } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import LoginPage from './components/LoginPage';
 import TransfersView from './components/TransfersView';
@@ -8,17 +8,26 @@ import PurchaseOrdersView from './components/PurchaseOrdersView';
 import POSView from './components/POSView';
 import {
   clearStoredToken,
+  completeKitchenOrder,
   createInventoryItem,
+  createRecipe,
+  createStockMovement,
   createUser,
   deleteInventoryItem,
+  deleteRecipe,
   deleteUser,
   getInventory,
+  getKitchenOrders,
   getLocations,
+  getRecipes,
+  getStockMovements,
   getUsers,
   loginUser,
   storeToken,
   updateInventoryItem,
-  updateUser
+  updateRecipe,
+  updateUser,
+  voidKitchenOrder
 } from './api/client';
 
 // Import types and sample data generation
@@ -60,10 +69,22 @@ interface StockAlert {
 }
 
 type ApiLocation = Location & { _count?: { items: number } };
-type ApiInventoryItem = Omit<InventoryItem, 'dateAdded' | 'location'> & {
+type ApiInventoryItem = Omit<InventoryItem, 'dateAdded' | 'location' | 'targetCustomer' | 'subcategory' | 'size' | 'condition'> & {
   dateAdded: string;
   locationId: string;
   location?: ApiLocation;
+  itemType?: string;
+  sku?: string | null;
+  targetCustomer?: InventoryItem['targetCustomer'] | null;
+  subcategory?: string | null;
+  size?: string | null;
+  condition?: InventoryItem['condition'] | null;
+  unit?: string | null;
+  minStock?: number | null;
+  maxStock?: number | null;
+  reorderPoint?: number | null;
+  expiryDate?: string | null;
+  storageTemperature?: string | null;
 };
 
 const formatDate = (value: string) => value ? new Date(value).toISOString().split('T')[0] : '';
@@ -81,10 +102,10 @@ const mapApiInventoryItem = (item: ApiInventoryItem): InventoryItem & { location
   id: item.id,
   name: item.name,
   category: item.category,
-  targetCustomer: item.targetCustomer,
-  subcategory: item.subcategory,
-  size: item.size,
-  condition: item.condition,
+  targetCustomer: item.targetCustomer ?? 'Unisex',
+  subcategory: item.subcategory ?? 'General',
+  size: item.size ?? 'N/A',
+  condition: item.condition ?? 'Good',
   quantity: item.quantity,
   price: item.price,
   dateAdded: formatDate(item.dateAdded),
@@ -102,11 +123,11 @@ const mapApiUser = (user: any): User => ({
 });
 
 
-type ViewType = 'dashboard' | 'stock-alerts' | 'inventory' | 'pos' | 'purchase-orders' | 'products-received' | 'item-bundling' | 'transfers' | 'multilocation' | 'reports' | 'user-management';
+type ViewType = 'dashboard' | 'stock-alerts' | 'inventory' | 'pos' | 'purchase-orders' | 'products-received' | 'item-bundling' | 'transfers' | 'multilocation' | 'reports' | 'user-management' | 'restaurant-ingredients' | 'restaurant-menu-items' | 'restaurant-recipes' | 'restaurant-kitchen-orders' | 'restaurant-spoilage';
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentUser, setCurrentUser] = useState<{ id?: string; name?: string; email: string; role: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ id?: string; name?: string; email: string; role: string; businessId?: string; modules?: string[] } | null>(null);
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
   const [inventory, setInventory] = useState<InventoryItem[]>(generateSampleData());
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>(generatePurchaseOrders());
@@ -117,6 +138,7 @@ export default function App() {
   const [locations, setLocations] = useState<Location[]>(generateLocations());
   const [users, setUsers] = useState<User[]>(generateUsers());
   const [sales, setSales] = useState<Sale[]>(generateSales());
+  const hasRestaurantModule = currentUser?.modules?.includes('RESTAURANT') ?? false;
 
   // Global handler to remove leading zeros from number inputs
   useEffect(() => {
@@ -147,7 +169,7 @@ export default function App() {
     const loadPhaseOneData = async () => {
       try {
         const [inventoryData, locationData] = await Promise.all([
-          getInventory(),
+          getInventory({ itemType: 'UKAY_ITEM' }),
           getLocations()
         ]);
 
@@ -383,7 +405,9 @@ export default function App() {
         id: response.user.id,
         name: response.user.name,
         email: response.user.email,
-        role: response.user.role
+        role: response.user.role,
+        businessId: response.user.businessId,
+        modules: response.user.modules
       });
       setIsLoggedIn(true);
     } catch (error) {
@@ -465,6 +489,33 @@ export default function App() {
             <ReportsIcon />
             Reports
           </NavButton>
+          {hasRestaurantModule && (
+            <>
+              <div className="px-3 py-2 text-[11px] uppercase tracking-wide text-[#00A7A5] font-semibold">
+                Restaurant
+              </div>
+              <NavButton active={currentView === 'restaurant-ingredients'} onClick={() => setCurrentView('restaurant-ingredients')}>
+                <RestaurantIngredientsIcon />
+                Ingredients
+              </NavButton>
+              <NavButton active={currentView === 'restaurant-menu-items'} onClick={() => setCurrentView('restaurant-menu-items')}>
+                <RestaurantMenuIcon />
+                Menu Items
+              </NavButton>
+              <NavButton active={currentView === 'restaurant-recipes'} onClick={() => setCurrentView('restaurant-recipes')}>
+                <RestaurantRecipesIcon />
+                Recipes
+              </NavButton>
+              <NavButton active={currentView === 'restaurant-kitchen-orders'} onClick={() => setCurrentView('restaurant-kitchen-orders')}>
+                <RestaurantKitchenIcon />
+                Kitchen Orders
+              </NavButton>
+              <NavButton active={currentView === 'restaurant-spoilage'} onClick={() => setCurrentView('restaurant-spoilage')}>
+                <RestaurantSpoilageIcon />
+                Spoilage & Expiry
+              </NavButton>
+            </>
+          )}
           {currentUser?.role === 'Admin' && (
             <NavButton active={currentView === 'user-management'} onClick={() => setCurrentView('user-management')}>
               <UserManagementIcon />
@@ -580,6 +631,21 @@ export default function App() {
               users={users}
               currentUser={currentUser}
             />
+          )}
+          {currentView === 'restaurant-ingredients' && hasRestaurantModule && (
+            <RestaurantIngredientsView locations={locations} />
+          )}
+          {currentView === 'restaurant-menu-items' && hasRestaurantModule && (
+            <RestaurantMenuItemsView locations={locations} />
+          )}
+          {currentView === 'restaurant-recipes' && hasRestaurantModule && (
+            <RestaurantRecipesView />
+          )}
+          {currentView === 'restaurant-kitchen-orders' && hasRestaurantModule && (
+            <RestaurantKitchenOrdersView />
+          )}
+          {currentView === 'restaurant-spoilage' && hasRestaurantModule && (
+            <RestaurantSpoilageView />
           )}
           {currentView === 'user-management' && (
             <UserManagementView
@@ -5355,6 +5421,685 @@ function UserManagementView({
   );
 }
 
+type RestaurantInventoryItem = {
+  id: string;
+  name: string;
+  category: string;
+  quantity: number;
+  price: number;
+  unit?: string | null;
+  minStock?: number | null;
+  reorderPoint?: number | null;
+  expiryDate?: string | null;
+  storageTemperature?: string | null;
+  locationId: string;
+  location?: ApiLocation;
+};
+
+type RestaurantRecipe = {
+  id: string;
+  name: string;
+  category: string;
+  servings: number;
+  yieldPercentage: number;
+  sellingPrice?: number | null;
+  isActive: boolean;
+  menuItem?: RestaurantInventoryItem | null;
+  ingredients: {
+    id: string;
+    quantity: number;
+    unit?: string | null;
+    item: RestaurantInventoryItem;
+  }[];
+};
+
+type RestaurantKitchenOrder = {
+  id: string;
+  receiptNo: string;
+  quantity: number;
+  status: 'COMPLETED' | 'VOIDED';
+  createdAt: string;
+  voidReason?: string | null;
+  recipe: RestaurantRecipe;
+};
+
+const formatPeso = (value: number | null | undefined) => `₱${Number(value ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+
+function RestaurantIngredientsView({ locations }: { locations: Location[] }) {
+  const [ingredients, setIngredients] = useState<RestaurantInventoryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [form, setForm] = useState({
+    name: '',
+    category: 'Ingredients',
+    quantity: 0,
+    unit: 'kg',
+    price: 0,
+    minStock: 0,
+    reorderPoint: 0,
+    expiryDate: '',
+    storageTemperature: '',
+    locationId: ''
+  });
+
+  const loadIngredients = async () => {
+    setIsLoading(true);
+    try {
+      const data = await getInventory({ itemType: 'INGREDIENT' });
+      setIngredients(data);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to load ingredients');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadIngredients();
+  }, []);
+
+  useEffect(() => {
+    if (!form.locationId && locations[0]?.id) {
+      setForm((current) => ({ ...current, locationId: locations[0].id }));
+    }
+  }, [form.locationId, locations]);
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!form.name || !form.locationId) return;
+
+    try {
+      await createInventoryItem({
+        name: form.name,
+        itemType: 'INGREDIENT',
+        category: form.category,
+        quantity: Number(form.quantity),
+        price: Number(form.price),
+        unit: form.unit,
+        minStock: Number(form.minStock),
+        reorderPoint: Number(form.reorderPoint),
+        expiryDate: form.expiryDate || undefined,
+        storageTemperature: form.storageTemperature || undefined,
+        locationId: form.locationId
+      });
+      setForm({
+        name: '',
+        category: 'Ingredients',
+        quantity: 0,
+        unit: 'kg',
+        price: 0,
+        minStock: 0,
+        reorderPoint: 0,
+        expiryDate: '',
+        storageTemperature: '',
+        locationId: form.locationId
+      });
+      await loadIngredients();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to save ingredient');
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <form onSubmit={handleSubmit} className="bg-white border border-[rgba(0,0,0,0.1)] rounded-[8px] p-5 grid grid-cols-1 lg:grid-cols-4 gap-4">
+        <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ingredient name" className="px-3 py-2 border rounded-[6px] text-sm" required />
+        <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Category" className="px-3 py-2 border rounded-[6px] text-sm" required />
+        <select value={form.locationId} onChange={(e) => setForm({ ...form, locationId: e.target.value })} className="px-3 py-2 border rounded-[6px] text-sm" required>
+          {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
+        </select>
+        <input value={form.storageTemperature} onChange={(e) => setForm({ ...form, storageTemperature: e.target.value })} placeholder="Storage" className="px-3 py-2 border rounded-[6px] text-sm" />
+        <input type="number" min="0" step="0.01" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) })} placeholder="Qty" className="px-3 py-2 border rounded-[6px] text-sm" />
+        <input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} placeholder="Unit" className="px-3 py-2 border rounded-[6px] text-sm" />
+        <input type="number" min="0" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} placeholder="Unit cost" className="px-3 py-2 border rounded-[6px] text-sm" />
+        <input type="date" value={form.expiryDate} onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} className="px-3 py-2 border rounded-[6px] text-sm" />
+        <input type="number" min="0" step="0.01" value={form.minStock} onChange={(e) => setForm({ ...form, minStock: Number(e.target.value) })} placeholder="Min stock" className="px-3 py-2 border rounded-[6px] text-sm" />
+        <input type="number" min="0" step="0.01" value={form.reorderPoint} onChange={(e) => setForm({ ...form, reorderPoint: Number(e.target.value) })} placeholder="Reorder point" className="px-3 py-2 border rounded-[6px] text-sm" />
+        <button type="submit" className="lg:col-span-2 bg-[#007A5E] text-white rounded-[6px] text-sm font-medium">Add Ingredient</button>
+      </form>
+
+      <div className="bg-white border border-[rgba(0,0,0,0.1)] rounded-[8px] overflow-hidden">
+        <table className="w-full">
+          <thead className="bg-[#F8FAFB] border-b">
+            <tr>
+              <th className="text-left px-4 py-3 text-sm">Ingredient</th>
+              <th className="text-left px-4 py-3 text-sm">Stock</th>
+              <th className="text-left px-4 py-3 text-sm">Cost</th>
+              <th className="text-left px-4 py-3 text-sm">Expiry</th>
+              <th className="text-left px-4 py-3 text-sm">Location</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-[#6b7280]">Loading...</td></tr>
+            ) : ingredients.map((ingredient) => (
+              <tr key={ingredient.id} className="border-b last:border-b-0">
+                <td className="px-4 py-3">
+                  <p className="text-sm font-medium text-[#323B42]">{ingredient.name}</p>
+                  <p className="text-xs text-[#6b7280]">{ingredient.category}</p>
+                </td>
+                <td className="px-4 py-3 text-sm">{ingredient.quantity} {ingredient.unit || 'unit'}</td>
+                <td className="px-4 py-3 text-sm">{formatPeso(ingredient.price)}</td>
+                <td className="px-4 py-3 text-sm">{ingredient.expiryDate ? formatDate(ingredient.expiryDate) : '-'}</td>
+                <td className="px-4 py-3 text-sm">{ingredient.location?.name ?? 'Unassigned'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function RestaurantMenuItemsView({ locations }: { locations: Location[] }) {
+  const [menuItems, setMenuItems] = useState<RestaurantInventoryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [form, setForm] = useState({
+    name: '',
+    category: 'Menu',
+    price: 0,
+    locationId: ''
+  });
+
+  const loadMenuItems = async () => {
+    setIsLoading(true);
+    try {
+      const data = await getInventory({ itemType: 'MENU_ITEM' });
+      setMenuItems(data);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to load menu items');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadMenuItems();
+  }, []);
+
+  useEffect(() => {
+    if (!form.locationId && locations[0]?.id) {
+      setForm((current) => ({ ...current, locationId: locations[0].id }));
+    }
+  }, [form.locationId, locations]);
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!form.name || !form.locationId) return;
+
+    try {
+      await createInventoryItem({
+        name: form.name,
+        itemType: 'MENU_ITEM',
+        category: form.category,
+        quantity: 0,
+        price: Number(form.price),
+        unit: 'serving',
+        locationId: form.locationId
+      });
+      setForm({ name: '', category: 'Menu', price: 0, locationId: form.locationId });
+      await loadMenuItems();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to save menu item');
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <form onSubmit={handleSubmit} className="bg-white border border-[rgba(0,0,0,0.1)] rounded-[8px] p-5 grid grid-cols-1 lg:grid-cols-[1fr_180px_160px_1fr_160px] gap-4">
+        <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Menu item name" className="px-3 py-2 border rounded-[6px] text-sm" required />
+        <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Category" className="px-3 py-2 border rounded-[6px] text-sm" required />
+        <input type="number" min="0" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} placeholder="Selling price" className="px-3 py-2 border rounded-[6px] text-sm" />
+        <select value={form.locationId} onChange={(e) => setForm({ ...form, locationId: e.target.value })} className="px-3 py-2 border rounded-[6px] text-sm" required>
+          {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
+        </select>
+        <button type="submit" className="bg-[#007A5E] text-white rounded-[6px] text-sm font-medium">Add Menu Item</button>
+      </form>
+
+      <div className="bg-white border border-[rgba(0,0,0,0.1)] rounded-[8px] overflow-hidden">
+        <table className="w-full">
+          <thead className="bg-[#F8FAFB] border-b">
+            <tr>
+              <th className="text-left px-4 py-3 text-sm">Menu Item</th>
+              <th className="text-left px-4 py-3 text-sm">Price</th>
+              <th className="text-left px-4 py-3 text-sm">Location</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              <tr><td colSpan={3} className="px-4 py-8 text-center text-sm text-[#6b7280]">Loading...</td></tr>
+            ) : menuItems.map((item) => (
+              <tr key={item.id} className="border-b last:border-b-0">
+                <td className="px-4 py-3">
+                  <p className="text-sm font-medium text-[#323B42]">{item.name}</p>
+                  <p className="text-xs text-[#6b7280]">{item.category}</p>
+                </td>
+                <td className="px-4 py-3 text-sm font-semibold">{formatPeso(item.price)}</td>
+                <td className="px-4 py-3 text-sm">{item.location?.name ?? 'Unassigned'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function RestaurantRecipesView() {
+  const [ingredients, setIngredients] = useState<RestaurantInventoryItem[]>([]);
+  const [menuItems, setMenuItems] = useState<RestaurantInventoryItem[]>([]);
+  const [recipes, setRecipes] = useState<RestaurantRecipe[]>([]);
+  const [form, setForm] = useState({ name: '', category: 'Main Course', servings: 1, sellingPrice: 0, menuItemId: '' });
+  const [rows, setRows] = useState([{ itemId: '', quantity: 1, unit: 'kg' }]);
+
+  const loadData = async () => {
+    try {
+      const [ingredientData, menuItemData, recipeData] = await Promise.all([
+        getInventory({ itemType: 'INGREDIENT' }),
+        getInventory({ itemType: 'MENU_ITEM' }),
+        getRecipes()
+      ]);
+      setIngredients(ingredientData);
+      setMenuItems(menuItemData);
+      setRecipes(recipeData);
+      if (!rows[0].itemId && ingredientData[0]?.id) {
+        setRows([{ itemId: ingredientData[0].id, quantity: 1, unit: ingredientData[0].unit || 'kg' }]);
+      }
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to load recipes');
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    try {
+      await createRecipe({
+        ...form,
+        servings: Number(form.servings),
+        sellingPrice: Number(form.sellingPrice),
+        menuItemId: form.menuItemId || undefined,
+        ingredients: rows.filter((row) => row.itemId).map((row) => ({
+          itemId: row.itemId,
+          quantity: Number(row.quantity),
+          unit: row.unit,
+          unitCost: ingredients.find((item) => item.id === row.itemId)?.price ?? 0
+        }))
+      });
+      setForm({ name: '', category: 'Main Course', servings: 1, sellingPrice: 0, menuItemId: '' });
+      setRows(ingredients[0] ? [{ itemId: ingredients[0].id, quantity: 1, unit: ingredients[0].unit || 'kg' }] : [{ itemId: '', quantity: 1, unit: 'kg' }]);
+      await loadData();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to save recipe');
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Delete this recipe?')) return;
+    try {
+      await deleteRecipe(id);
+      await loadData();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to delete recipe');
+    }
+  };
+
+  const recipeCost = (recipe: RestaurantRecipe) => recipe.ingredients.reduce((sum, ingredient) => sum + (ingredient.item.price * ingredient.quantity), 0);
+
+  return (
+    <div className="space-y-5">
+      <form onSubmit={handleSubmit} className="bg-white border border-[rgba(0,0,0,0.1)] rounded-[8px] p-5 space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+          <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Recipe name" className="px-3 py-2 border rounded-[6px] text-sm" required />
+          <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Category" className="px-3 py-2 border rounded-[6px] text-sm" required />
+          <input type="number" min="1" value={form.servings} onChange={(e) => setForm({ ...form, servings: Number(e.target.value) })} placeholder="Servings" className="px-3 py-2 border rounded-[6px] text-sm" required />
+          <input type="number" min="0" step="0.01" value={form.sellingPrice} onChange={(e) => setForm({ ...form, sellingPrice: Number(e.target.value) })} placeholder="Selling price" className="px-3 py-2 border rounded-[6px] text-sm" />
+          <select value={form.menuItemId} onChange={(e) => setForm({ ...form, menuItemId: e.target.value })} className="px-3 py-2 border rounded-[6px] text-sm">
+            <option value="">No menu item</option>
+            {menuItems.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+          </select>
+        </div>
+
+        <div className="space-y-2">
+          {rows.map((row, index) => (
+            <div key={index} className="grid grid-cols-1 lg:grid-cols-[1fr_120px_120px_44px] gap-3">
+              <select value={row.itemId} onChange={(e) => {
+                const item = ingredients.find((ingredient) => ingredient.id === e.target.value);
+                setRows(rows.map((current, rowIndex) => rowIndex === index ? { ...current, itemId: e.target.value, unit: item?.unit || current.unit } : current));
+              }} className="px-3 py-2 border rounded-[6px] text-sm" required>
+                {ingredients.map((ingredient) => <option key={ingredient.id} value={ingredient.id}>{ingredient.name}</option>)}
+              </select>
+              <input type="number" min="0.01" step="0.01" value={row.quantity} onChange={(e) => setRows(rows.map((current, rowIndex) => rowIndex === index ? { ...current, quantity: Number(e.target.value) } : current))} className="px-3 py-2 border rounded-[6px] text-sm" />
+              <input value={row.unit} onChange={(e) => setRows(rows.map((current, rowIndex) => rowIndex === index ? { ...current, unit: e.target.value } : current))} className="px-3 py-2 border rounded-[6px] text-sm" />
+              <button type="button" onClick={() => setRows(rows.filter((_, rowIndex) => rowIndex !== index))} className="border rounded-[6px] text-[#991b1b]"><Trash2 className="size-4 mx-auto" /></button>
+            </div>
+          ))}
+          <button type="button" onClick={() => setRows([...rows, { itemId: ingredients[0]?.id || '', quantity: 1, unit: ingredients[0]?.unit || 'kg' }])} className="text-sm text-[#007A5E] font-medium">Add ingredient row</button>
+        </div>
+
+        <button type="submit" className="bg-[#007A5E] text-white px-5 py-2 rounded-[6px] text-sm font-medium">Save Recipe</button>
+      </form>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        {recipes.map((recipe) => (
+          <div key={recipe.id} className="bg-white border border-[rgba(0,0,0,0.1)] rounded-[8px] p-5">
+            <div className="flex items-start justify-between gap-4 mb-3">
+              <div>
+                <h3 className="text-[16px] font-semibold text-[#323B42]">{recipe.name}</h3>
+                {recipe.menuItem && (
+                  <p className="text-xs text-[#007A5E] mt-1">Menu item: {recipe.menuItem.name}</p>
+                )}
+                <p className="text-sm text-[#6b7280]">{recipe.category} • {recipe.servings} servings</p>
+              </div>
+              <button onClick={() => handleDelete(recipe.id)} className="p-2 text-[#991b1b] hover:bg-[#ffe2e2] rounded-[6px]"><Trash2 className="size-4" /></button>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="bg-[#F8FAFB] rounded-[6px] p-3">
+                <p className="text-xs text-[#6b7280]">Cost</p>
+                <p className="text-sm font-semibold">{formatPeso(recipeCost(recipe))}</p>
+              </div>
+              <div className="bg-[#F8FAFB] rounded-[6px] p-3">
+                <p className="text-xs text-[#6b7280]">Price</p>
+                <p className="text-sm font-semibold">{formatPeso(recipe.sellingPrice)}</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {recipe.ingredients.map((ingredient) => (
+                <div key={ingredient.id} className="flex justify-between text-sm border-t pt-2">
+                  <span>{ingredient.item.name}</span>
+                  <span>{ingredient.quantity} {ingredient.unit || ingredient.item.unit || 'unit'}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RestaurantKitchenOrdersView() {
+  const [recipes, setRecipes] = useState<RestaurantRecipe[]>([]);
+  const [orders, setOrders] = useState<RestaurantKitchenOrder[]>([]);
+  const [form, setForm] = useState({ receiptNo: '', recipeId: '', quantity: 1, notes: '' });
+
+  const loadData = async () => {
+    try {
+      const [recipeData, orderData] = await Promise.all([
+        getRecipes({ active: true }),
+        getKitchenOrders()
+      ]);
+      setRecipes(recipeData);
+      setOrders(orderData);
+      if (!form.recipeId && recipeData[0]?.id) {
+        setForm((current) => ({ ...current, recipeId: recipeData[0].id }));
+      }
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to load kitchen orders');
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    try {
+      await completeKitchenOrder({
+        receiptNo: form.receiptNo,
+        recipeId: form.recipeId,
+        quantity: Number(form.quantity),
+        notes: form.notes || undefined
+      });
+      setForm({ receiptNo: '', recipeId: form.recipeId, quantity: 1, notes: '' });
+      await loadData();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to complete kitchen order');
+    }
+  };
+
+  const handleVoid = async (order: RestaurantKitchenOrder) => {
+    const reason = prompt('Void reason');
+    if (!reason) return;
+    try {
+      await voidKitchenOrder(order.id, reason);
+      await loadData();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to void order');
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <form onSubmit={handleSubmit} className="bg-white border border-[rgba(0,0,0,0.1)] rounded-[8px] p-5 grid grid-cols-1 lg:grid-cols-[180px_1fr_120px_1fr_160px] gap-4">
+        <input value={form.receiptNo} onChange={(e) => setForm({ ...form, receiptNo: e.target.value })} placeholder="Receipt no." className="px-3 py-2 border rounded-[6px] text-sm" required />
+        <select value={form.recipeId} onChange={(e) => setForm({ ...form, recipeId: e.target.value })} className="px-3 py-2 border rounded-[6px] text-sm" required>
+          {recipes.map((recipe) => <option key={recipe.id} value={recipe.id}>{recipe.name}</option>)}
+        </select>
+        <input type="number" min="1" step="1" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) })} className="px-3 py-2 border rounded-[6px] text-sm" required />
+        <input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Notes" className="px-3 py-2 border rounded-[6px] text-sm" />
+        <button type="submit" className="bg-[#007A5E] text-white rounded-[6px] text-sm font-medium">Complete Order</button>
+      </form>
+
+      <div className="bg-white border border-[rgba(0,0,0,0.1)] rounded-[8px] overflow-hidden">
+        <table className="w-full">
+          <thead className="bg-[#F8FAFB] border-b">
+            <tr>
+              <th className="text-left px-4 py-3 text-sm">Receipt</th>
+              <th className="text-left px-4 py-3 text-sm">Recipe</th>
+              <th className="text-left px-4 py-3 text-sm">Qty</th>
+              <th className="text-left px-4 py-3 text-sm">Status</th>
+              <th className="text-left px-4 py-3 text-sm">Date</th>
+              <th className="text-left px-4 py-3 text-sm">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {orders.map((order) => (
+              <tr key={order.id} className="border-b last:border-b-0">
+                <td className="px-4 py-3 text-sm font-medium">{order.receiptNo}</td>
+                <td className="px-4 py-3 text-sm">{order.recipe?.name}</td>
+                <td className="px-4 py-3 text-sm">{order.quantity}</td>
+                <td className="px-4 py-3 text-sm">
+                  <span className={`px-2 py-1 rounded text-xs font-semibold ${order.status === 'COMPLETED' ? 'bg-[#E0F5F1] text-[#008967]' : 'bg-[#ffe2e2] text-[#991b1b]'}`}>
+                    {order.status}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-sm">{formatDate(order.createdAt)}</td>
+                <td className="px-4 py-3 text-sm">
+                  {order.status === 'COMPLETED' && (
+                    <button onClick={() => handleVoid(order)} className="text-[#991b1b] font-medium">Void</button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+type RestaurantStockMovement = {
+  id: string;
+  type: 'SPOILAGE' | 'EXPIRY' | string;
+  quantity: number;
+  unit?: string | null;
+  reason?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  item: RestaurantInventoryItem;
+  location?: ApiLocation;
+};
+
+const getDaysUntil = (value?: string | null) => {
+  if (!value) return null;
+  const target = new Date(value);
+  target.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.ceil((target.getTime() - today.getTime()) / 86400000);
+};
+
+function RestaurantSpoilageView() {
+  const [ingredients, setIngredients] = useState<RestaurantInventoryItem[]>([]);
+  const [movements, setMovements] = useState<RestaurantStockMovement[]>([]);
+  const [form, setForm] = useState({
+    itemId: '',
+    type: 'SPOILAGE' as 'SPOILAGE' | 'EXPIRY',
+    quantity: 1,
+    reason: '',
+    notes: ''
+  });
+
+  const loadData = async () => {
+    try {
+      const [ingredientData, spoilageData, expiryData] = await Promise.all([
+        getInventory({ itemType: 'INGREDIENT' }),
+        getStockMovements({ type: 'SPOILAGE' }),
+        getStockMovements({ type: 'EXPIRY' })
+      ]);
+      setIngredients(ingredientData);
+      setMovements([...spoilageData, ...expiryData].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+      if (!form.itemId && ingredientData[0]?.id) {
+        setForm((current) => ({ ...current, itemId: ingredientData[0].id }));
+      }
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to load spoilage data');
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const expiringIngredients = useMemo(() => {
+    return ingredients
+      .map((ingredient) => ({ ...ingredient, daysUntilExpiry: getDaysUntil(ingredient.expiryDate) }))
+      .filter((ingredient) => ingredient.daysUntilExpiry !== null && ingredient.daysUntilExpiry <= 7)
+      .sort((a, b) => (a.daysUntilExpiry ?? 0) - (b.daysUntilExpiry ?? 0));
+  }, [ingredients]);
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const item = ingredients.find((ingredient) => ingredient.id === form.itemId);
+    if (!item) return;
+
+    try {
+      await createStockMovement({
+        itemId: form.itemId,
+        type: form.type,
+        quantity: Number(form.quantity),
+        reason: form.reason || form.type,
+        notes: form.notes || undefined,
+        referenceType: 'RESTAURANT_WASTE'
+      });
+      setForm({
+        itemId: form.itemId,
+        type: 'SPOILAGE',
+        quantity: 1,
+        reason: '',
+        notes: ''
+      });
+      await loadData();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to record spoilage');
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <form onSubmit={handleSubmit} className="bg-white border border-[rgba(0,0,0,0.1)] rounded-[8px] p-5 grid grid-cols-1 lg:grid-cols-[1fr_160px_120px_1fr_1fr_160px] gap-4">
+        <select value={form.itemId} onChange={(e) => setForm({ ...form, itemId: e.target.value })} className="px-3 py-2 border rounded-[6px] text-sm" required>
+          {ingredients.map((ingredient) => (
+            <option key={ingredient.id} value={ingredient.id}>
+              {ingredient.name} ({ingredient.quantity} {ingredient.unit || 'unit'})
+            </option>
+          ))}
+        </select>
+        <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as 'SPOILAGE' | 'EXPIRY' })} className="px-3 py-2 border rounded-[6px] text-sm">
+          <option value="SPOILAGE">Spoilage</option>
+          <option value="EXPIRY">Expiry</option>
+        </select>
+        <input type="number" min="0.01" step="0.01" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) })} className="px-3 py-2 border rounded-[6px] text-sm" required />
+        <input value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} placeholder="Reason" className="px-3 py-2 border rounded-[6px] text-sm" />
+        <input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Notes" className="px-3 py-2 border rounded-[6px] text-sm" />
+        <button type="submit" className="bg-[#991b1b] text-white rounded-[6px] text-sm font-medium">Record Waste</button>
+      </form>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        <div className="bg-white border border-[rgba(0,0,0,0.1)] rounded-[8px] overflow-hidden">
+          <div className="px-4 py-3 border-b bg-[#F8FAFB]">
+            <h3 className="text-sm font-semibold text-[#323B42]">Expiring Ingredients</h3>
+          </div>
+          <table className="w-full">
+            <thead className="border-b">
+              <tr>
+                <th className="text-left px-4 py-3 text-sm">Ingredient</th>
+                <th className="text-left px-4 py-3 text-sm">Expiry</th>
+                <th className="text-left px-4 py-3 text-sm">Stock</th>
+              </tr>
+            </thead>
+            <tbody>
+              {expiringIngredients.length === 0 ? (
+                <tr><td colSpan={3} className="px-4 py-8 text-center text-sm text-[#6b7280]">No ingredients expiring within 7 days</td></tr>
+              ) : expiringIngredients.map((ingredient) => (
+                <tr key={ingredient.id} className="border-b last:border-b-0">
+                  <td className="px-4 py-3">
+                    <p className="text-sm font-medium">{ingredient.name}</p>
+                    <p className="text-xs text-[#6b7280]">{ingredient.location?.name ?? 'Unassigned'}</p>
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    <span className={ingredient.daysUntilExpiry !== null && ingredient.daysUntilExpiry <= 0 ? 'text-[#991b1b] font-semibold' : ''}>
+                      {ingredient.expiryDate ? formatDate(ingredient.expiryDate) : '-'} ({ingredient.daysUntilExpiry}d)
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-sm">{ingredient.quantity} {ingredient.unit || 'unit'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="bg-white border border-[rgba(0,0,0,0.1)] rounded-[8px] overflow-hidden">
+          <div className="px-4 py-3 border-b bg-[#F8FAFB]">
+            <h3 className="text-sm font-semibold text-[#323B42]">Spoilage & Expiry Log</h3>
+          </div>
+          <table className="w-full">
+            <thead className="border-b">
+              <tr>
+                <th className="text-left px-4 py-3 text-sm">Item</th>
+                <th className="text-left px-4 py-3 text-sm">Qty</th>
+                <th className="text-left px-4 py-3 text-sm">Type</th>
+                <th className="text-left px-4 py-3 text-sm">Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {movements.length === 0 ? (
+                <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-[#6b7280]">No waste records yet</td></tr>
+              ) : movements.map((movement) => (
+                <tr key={movement.id} className="border-b last:border-b-0">
+                  <td className="px-4 py-3">
+                    <p className="text-sm font-medium">{movement.item.name}</p>
+                    <p className="text-xs text-[#6b7280]">{movement.reason || movement.notes || '-'}</p>
+                  </td>
+                  <td className="px-4 py-3 text-sm">{movement.quantity} {movement.unit || movement.item.unit || 'unit'}</td>
+                  <td className="px-4 py-3 text-sm">
+                    <span className="px-2 py-1 rounded text-xs font-semibold bg-[#ffe2e2] text-[#991b1b]">{movement.type}</span>
+                  </td>
+                  <td className="px-4 py-3 text-sm">{formatDate(movement.createdAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Icon components using lucide-react
 const DashboardIcon = () => <LayoutDashboard className="size-5" />;
 const StockAlertsIcon = () => <AlertTriangle className="size-5" />;
@@ -5368,6 +6113,11 @@ const TransfersIcon = () => <ArrowRightLeft className="size-5" />;
 const MultilocationIcon = () => <MapPin className="size-5" />;
 const ReportsIcon = () => <FileText className="size-5" />;
 const UserManagementIcon = () => <Users className="size-5" />;
+const RestaurantIngredientsIcon = () => <Utensils className="size-5" />;
+const RestaurantMenuIcon = () => <Package className="size-5" />;
+const RestaurantRecipesIcon = () => <ChefHat className="size-5" />;
+const RestaurantKitchenIcon = () => <ClipboardList className="size-5" />;
+const RestaurantSpoilageIcon = () => <Ban className="size-5" />;
 const LogoutIcon = () => <LogOut className="size-4" />;
 const CloseIcon = () => <X className="size-4" />;
 const ViewIcon = () => <Eye className="size-4" />;
