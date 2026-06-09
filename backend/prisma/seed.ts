@@ -410,18 +410,34 @@ async function main() {
     create: { name: 'Ukay-Only Demo', modules: ['RETAIL'] },
   });
 
-  await prisma.user.upsert({
+  const legacyRetailAdmin = await prisma.user.findUnique({
     where: { email: 'admin@ukay.com' },
+    select: { id: true },
+  });
+  const currentRetailAdmin = await prisma.user.findUnique({
+    where: { email: 'admin@retail.com' },
+    select: { id: true },
+  });
+
+  if (legacyRetailAdmin && !currentRetailAdmin) {
+    await prisma.user.update({
+      where: { id: legacyRetailAdmin.id },
+      data: { email: 'admin@retail.com' },
+    });
+  }
+
+  await prisma.user.upsert({
+    where: { email: 'admin@retail.com' },
     update: {
-      name: 'Ukay Admin',
+      name: 'Retail Admin',
       role: 'Admin',
       status: 'Active',
       passwordHash: adminPasswordHash,
       businessId: ukayBusiness.id,
     },
     create: {
-      name: 'Ukay Admin',
-      email: 'admin@ukay.com',
+      name: 'Retail Admin',
+      email: 'admin@retail.com',
       role: 'Admin',
       status: 'Active',
       passwordHash: adminPasswordHash,
@@ -431,11 +447,11 @@ async function main() {
 
   await prisma.location.upsert({
     where: { businessId_name: { businessId: ukayBusiness.id, name: 'Main Store' } },
-    update: { address: 'Downtown', manager: 'Ukay Admin', phone: '+63 900 100 0001' },
+    update: { address: 'Downtown', manager: 'Retail Admin', phone: '+63 900 100 0001' },
     create: {
       name: 'Main Store',
       address: 'Downtown',
-      manager: 'Ukay Admin',
+      manager: 'Retail Admin',
       phone: '+63 900 100 0001',
       businessId: ukayBusiness.id,
     },
