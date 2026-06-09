@@ -39,7 +39,7 @@ export default function POSView({
     setLoading(true);
     try {
       const [invData, salesData, locData] = await Promise.all([
-        getInventory({ itemType: 'UKAY_ITEM' }),
+        getInventory({ itemType: 'RETAIL_ITEM' }),
         getSales(),
         getLocations(),
       ]);

@@ -51,7 +51,7 @@ export function ItemBundlingView({
       setError(null);
       const [bundleData, inventoryData] = await Promise.all([
         getBundles(),
-        getInventory({ itemType: 'UKAY_ITEM' }),
+        getInventory({ itemType: 'RETAIL_ITEM' }),
       ]);
       setBundles(bundleData);
       setInventory(inventoryData);

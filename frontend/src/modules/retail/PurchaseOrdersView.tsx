@@ -104,7 +104,7 @@ export default function PurchaseOrdersView({
       const [ordersData, suppliersData, inventoryData] = await Promise.all([
         getPurchaseOrders(),
         getSuppliers(),
-        getInventory({ itemType: 'UKAY_ITEM' }),
+        getInventory({ itemType: 'RETAIL_ITEM' }),
       ]);
       setOrders(ordersData);
       setSuppliers(suppliersData);
