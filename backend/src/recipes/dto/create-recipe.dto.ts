@@ -5,6 +5,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUrl,
   IsUUID,
   Min,
   MinLength,
@@ -71,6 +72,38 @@ export class CreateRecipeDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsUrl()
+  imageUrl?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isVegetarian?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isVegan?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isGlutenFree?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isDairyFree?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isNutFree?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isHalal?: boolean;
+
+  @IsOptional()
+  @IsString()
+  allergenNotes?: string;
 
   @IsOptional()
   @IsUUID()

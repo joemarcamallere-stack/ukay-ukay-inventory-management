@@ -20,54 +20,37 @@ export class KitchenOrdersService {
     completedById?: string,
   ) {
     return this.prisma.$transaction(async (tx) => {
-      // Lock ingredient rows so concurrent orders cannot double-deduct the same stock
-      await tx.$queryRaw`
-        SELECT id FROM "InventoryItem"
-        WHERE id IN (
-          SELECT "itemId" FROM "RecipeIngredient" WHERE "recipeId" = ${createKitchenOrderDto.recipeId}
-        )
-        FOR UPDATE
-      `;
+      const initialStatus =
+        createKitchenOrderDto.status ?? KitchenOrderStatus.COMPLETED;
+      if (initialStatus === KitchenOrderStatus.VOIDED) {
+        throw new BadRequestException('New kitchen orders cannot start as voided');
+      }
 
-      const recipe = await tx.recipe.findFirst({
-        where: {
-          id: createKitchenOrderDto.recipeId,
-          businessId,
-          isActive: true,
-        },
-        include: {
-          ingredients: {
-            include: { item: true },
-          },
-        },
-      });
+      const locationId = await this.assertOrderContext(
+        tx,
+        createKitchenOrderDto.locationId,
+        createKitchenOrderDto.tableId,
+        businessId,
+      );
+
+      const recipe: any =
+        initialStatus === KitchenOrderStatus.COMPLETED
+          ? await this.loadRecipeForCompletion(
+              tx,
+              createKitchenOrderDto.recipeId,
+              businessId,
+            )
+          : await tx.recipe.findFirst({
+              where: {
+                id: createKitchenOrderDto.recipeId,
+                businessId,
+                isActive: true,
+              },
+            });
 
       if (!recipe) {
         throw new NotFoundException(
           `Recipe #${createKitchenOrderDto.recipeId} not found`,
-        );
-      }
-
-      if (recipe.ingredients.length === 0) {
-        throw new BadRequestException('Recipe has no ingredients to deduct');
-      }
-
-      const servingFactor =
-        createKitchenOrderDto.quantity / Math.max(recipe.servings, 1);
-
-      const deductions = recipe.ingredients.map((ingredient) => ({
-        ingredient,
-        requiredQuantity: ingredient.quantity * servingFactor,
-      }));
-
-      const insufficientIngredient = deductions.find(
-        ({ ingredient, requiredQuantity }) =>
-          ingredient.item.quantity < requiredQuantity,
-      );
-
-      if (insufficientIngredient) {
-        throw new BadRequestException(
-          `${insufficientIngredient.ingredient.item.name} does not have enough stock`,
         );
       }
 
@@ -79,8 +62,14 @@ export class KitchenOrdersService {
             recipeId: recipe.id,
             quantity: createKitchenOrderDto.quantity,
             notes: createKitchenOrderDto.notes,
+            status: initialStatus,
+            locationId,
+            tableId: createKitchenOrderDto.tableId,
             businessId,
-            completedById,
+            completedById:
+              initialStatus === KitchenOrderStatus.COMPLETED
+                ? completedById
+                : undefined,
           },
         });
       } catch (error) {
@@ -90,32 +79,14 @@ export class KitchenOrdersService {
         throw error;
       }
 
-      for (const { ingredient, requiredQuantity } of deductions) {
-        const previousQuantity = ingredient.item.quantity;
-        const newQuantity = previousQuantity - requiredQuantity;
-
-        await tx.inventoryItem.update({
-          where: { id: ingredient.itemId },
-          data: { quantity: newQuantity },
-        });
-
-        await tx.stockMovement.create({
-          data: {
-            type: 'RECIPE_CONSUMPTION',
-            quantity: requiredQuantity,
-            previousQuantity,
-            newQuantity,
-            unit: ingredient.item.unit ?? ingredient.unit,
-            reason: 'Kitchen order recipe consumption',
-            referenceType: 'KITCHEN_ORDER',
-            referenceId: order.id,
-            notes: `Receipt ${order.receiptNo} consumed ${recipe.name}`,
-            itemId: ingredient.itemId,
-            locationId: ingredient.item.locationId,
-            businessId,
-            createdById: completedById,
-          },
-        });
+      if (initialStatus === KitchenOrderStatus.COMPLETED) {
+        await this.deductRecipeInventory(
+          tx,
+          recipe,
+          order,
+          businessId,
+          completedById,
+        );
       }
 
       return tx.kitchenOrder.findUnique({
@@ -125,19 +96,85 @@ export class KitchenOrdersService {
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 
+  async updateStatus(
+    id: string,
+    status: KitchenOrderStatus,
+    businessId: string,
+    completedById?: string,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`
+        SELECT id FROM "KitchenOrder"
+        WHERE id = ${id}
+        FOR UPDATE
+      `;
+
+      const order = await tx.kitchenOrder.findFirst({
+        where: { id, businessId },
+      });
+      if (!order) throw new NotFoundException(`Kitchen order #${id} not found`);
+
+      const allowedNextStatus: Partial<
+        Record<KitchenOrderStatus, KitchenOrderStatus>
+      > = {
+        [KitchenOrderStatus.PENDING]: KitchenOrderStatus.PREPARING,
+        [KitchenOrderStatus.PREPARING]: KitchenOrderStatus.READY,
+        [KitchenOrderStatus.READY]: KitchenOrderStatus.COMPLETED,
+      };
+
+      if (allowedNextStatus[order.status] !== status) {
+        throw new BadRequestException(
+          `Kitchen order cannot move from ${order.status} to ${status}`,
+        );
+      }
+
+      if (status === KitchenOrderStatus.COMPLETED) {
+        const recipe = await this.loadRecipeForCompletion(
+          tx,
+          order.recipeId,
+          businessId,
+        );
+        await this.deductRecipeInventory(
+          tx,
+          recipe,
+          order,
+          businessId,
+          completedById,
+        );
+      }
+
+      await tx.kitchenOrder.update({
+        where: { id },
+        data: {
+          status,
+          ...(status === KitchenOrderStatus.COMPLETED
+            ? { completedById }
+            : {}),
+        },
+      });
+
+      return tx.kitchenOrder.findUnique({
+        where: { id },
+        include: this.kitchenOrderInclude,
+      });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  }
+
   async findAll(
     businessId: string,
     status?: string,
+    locationId?: string,
     page = 1,
     limit = 50,
   ): Promise<PaginatedResult<any>> {
-    const validStatus =
-      status === 'COMPLETED' || status === 'VOIDED'
-        ? (status as KitchenOrderStatus)
-        : undefined;
+    const validStatuses: string[] = Object.values(KitchenOrderStatus);
+    const validStatus = status && validStatuses.includes(status)
+      ? (status as KitchenOrderStatus)
+      : undefined;
     const where = {
       businessId,
       ...(validStatus ? { status: validStatus } : {}),
+      ...(locationId ? { locationId } : {}),
     };
     const [data, total] = await this.prisma.$transaction([
       this.prisma.kitchenOrder.findMany({
@@ -163,6 +200,12 @@ export class KitchenOrdersService {
 
   async void(id: string, voidDto: VoidKitchenOrderDto, businessId: string) {
     return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`
+        SELECT id FROM "KitchenOrder"
+        WHERE id = ${id}
+        FOR UPDATE
+      `;
+
       const order = await tx.kitchenOrder.findFirst({
         where: { id, businessId },
       });
@@ -172,12 +215,15 @@ export class KitchenOrdersService {
         throw new BadRequestException('Kitchen order is already voided');
       }
 
-      // Lock the affected inventory rows before restocking
+      // Lock the affected inventory rows before restocking.
       await tx.$queryRaw`
-        SELECT "itemId" FROM "StockMovement"
-        WHERE "referenceType" = 'KITCHEN_ORDER'
-          AND "referenceId" = ${order.id}
-          AND "type" = 'RECIPE_CONSUMPTION'
+        SELECT id FROM "InventoryItem"
+        WHERE id IN (
+          SELECT "itemId" FROM "StockMovement"
+          WHERE "referenceType" = 'KITCHEN_ORDER'
+            AND "referenceId" = ${order.id}
+            AND "type" = 'RECIPE_CONSUMPTION'
+        )
         FOR UPDATE
       `;
 
@@ -235,6 +281,118 @@ export class KitchenOrdersService {
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 
+  private async assertOrderContext(
+    tx: Prisma.TransactionClient,
+    locationId: string | undefined,
+    tableId: string | undefined,
+    businessId: string,
+  ) {
+    const location = locationId
+      ? await tx.location.findFirst({
+          where: { id: locationId, businessId },
+          select: { id: true },
+        })
+      : null;
+    if (locationId && !location) {
+      throw new NotFoundException(`Location #${locationId} not found`);
+    }
+
+    const table = tableId
+      ? await tx.diningTable.findFirst({
+          where: { id: tableId, businessId },
+          select: { id: true, locationId: true },
+        })
+      : null;
+    if (tableId && !table) {
+      throw new NotFoundException(`Dining table #${tableId} not found`);
+    }
+    if (table && locationId && table.locationId !== locationId) {
+      throw new BadRequestException(
+        'Dining table does not belong to the selected location',
+      );
+    }
+
+    return locationId ?? table?.locationId;
+  }
+
+  private async loadRecipeForCompletion(
+    tx: Prisma.TransactionClient,
+    recipeId: string,
+    businessId: string,
+  ) {
+    await tx.$queryRaw`
+      SELECT id FROM "InventoryItem"
+      WHERE id IN (
+        SELECT "itemId" FROM "RecipeIngredient" WHERE "recipeId" = ${recipeId}
+      )
+      FOR UPDATE
+    `;
+
+    const recipe = await tx.recipe.findFirst({
+      where: { id: recipeId, businessId, isActive: true },
+      include: {
+        ingredients: {
+          include: { item: true },
+        },
+      },
+    });
+    if (!recipe) throw new NotFoundException(`Recipe #${recipeId} not found`);
+    if (recipe.ingredients.length === 0) {
+      throw new BadRequestException('Recipe has no ingredients to deduct');
+    }
+    return recipe;
+  }
+
+  private async deductRecipeInventory(
+    tx: Prisma.TransactionClient,
+    recipe: Awaited<ReturnType<KitchenOrdersService['loadRecipeForCompletion']>>,
+    order: { id: string; receiptNo: string; quantity: number },
+    businessId: string,
+    completedById?: string,
+  ) {
+    const servingFactor = order.quantity / Math.max(recipe.servings, 1);
+    const deductions = recipe.ingredients.map((ingredient) => ({
+      ingredient,
+      requiredQuantity: ingredient.quantity * servingFactor,
+    }));
+    const insufficientIngredient = deductions.find(
+      ({ ingredient, requiredQuantity }) =>
+        ingredient.item.quantity < requiredQuantity,
+    );
+    if (insufficientIngredient) {
+      throw new BadRequestException(
+        `${insufficientIngredient.ingredient.item.name} does not have enough stock`,
+      );
+    }
+
+    for (const { ingredient, requiredQuantity } of deductions) {
+      const previousQuantity = ingredient.item.quantity;
+      const newQuantity = previousQuantity - requiredQuantity;
+
+      await tx.inventoryItem.update({
+        where: { id: ingredient.itemId },
+        data: { quantity: newQuantity },
+      });
+      await tx.stockMovement.create({
+        data: {
+          type: 'RECIPE_CONSUMPTION',
+          quantity: requiredQuantity,
+          previousQuantity,
+          newQuantity,
+          unit: ingredient.item.unit ?? ingredient.unit,
+          reason: 'Kitchen order recipe consumption',
+          referenceType: 'KITCHEN_ORDER',
+          referenceId: order.id,
+          notes: `Receipt ${order.receiptNo} consumed ${recipe.name}`,
+          itemId: ingredient.itemId,
+          locationId: ingredient.item.locationId,
+          businessId,
+          createdById: completedById,
+        },
+      });
+    }
+  }
+
   private readonly kitchenOrderInclude = {
     recipe: {
       include: {
@@ -244,5 +402,8 @@ export class KitchenOrdersService {
       },
     },
     completedBy: true,
+    location: { select: { id: true, name: true } },
+    table: { select: { id: true, tableNumber: true } },
+    sale: { select: { id: true, transactionNumber: true } },
   };
 }

@@ -17,13 +17,21 @@ export class BundlesService {
     items: { include: { inventoryItem: { select: { id: true, name: true, price: true, quantity: true, category: true } } } },
     createdBy: { select: { id: true, name: true } },
     approvedBy: { select: { id: true, name: true } },
+    location: { select: { id: true, name: true } },
   };
 
   async create(dto: CreateBundleDto, businessId: string, createdById: string, role: string) {
+    if (dto.locationId) {
+      await this.assertLocationInBusiness(dto.locationId, businessId);
+    }
     const inventoryItems = await this.prisma.inventoryItem.findMany({
       where: { id: { in: dto.items.map((i) => i.inventoryItemId) }, businessId },
       select: { id: true, price: true },
     });
+    const requestedItemIds = new Set(dto.items.map((item) => item.inventoryItemId));
+    if (inventoryItems.length !== requestedItemIds.size) {
+      throw new NotFoundException('One or more bundle items were not found');
+    }
 
     const itemPriceMap = new Map(inventoryItems.map((i) => [i.id, i.price]));
     const originalTotal = dto.items.reduce(
@@ -38,9 +46,12 @@ export class BundlesService {
     return this.prisma.bundlePackage.create({
       data: {
         name: dto.name,
+        description: dto.description,
+        imageUrl: dto.imageUrl,
         discount: dto.discount,
         price,
         status: status as any,
+        locationId: dto.locationId,
         businessId,
         createdById,
         ...(isAdmin && { approvedById: createdById, approvedAt: new Date() }),
@@ -58,12 +69,14 @@ export class BundlesService {
   async findAll(
     businessId: string,
     status?: string,
+    locationId?: string,
     page = 1,
     limit = 50,
   ): Promise<PaginatedResult<any>> {
     const where = {
       businessId,
       ...(status ? { status: status as any } : {}),
+      ...(locationId ? { locationId } : {}),
     };
     const [data, total] = await this.prisma.$transaction([
       this.prisma.bundlePackage.findMany({
@@ -171,5 +184,13 @@ export class BundlesService {
       throw new BadRequestException('Only PENDING or REJECTED bundles can be deleted');
     }
     await this.prisma.bundlePackage.delete({ where: { id } });
+  }
+
+  private async assertLocationInBusiness(locationId: string, businessId: string) {
+    const location = await this.prisma.location.findFirst({
+      where: { id: locationId, businessId },
+      select: { id: true },
+    });
+    if (!location) throw new NotFoundException(`Location #${locationId} not found`);
   }
 }

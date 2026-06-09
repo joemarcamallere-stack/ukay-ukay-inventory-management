@@ -14,11 +14,11 @@ async function main() {
   const business = await prisma.business.upsert({
     where: { name: 'Ukay + Restaurant Demo' },
     update: {
-      modules: ['UKAY', 'RESTAURANT'],
+      modules: ['RETAIL', 'RESTAURANT'],
     },
     create: {
       name: 'Ukay + Restaurant Demo',
-      modules: ['UKAY', 'RESTAURANT'],
+      modules: ['RETAIL', 'RESTAURANT'],
     },
   });
 
@@ -166,7 +166,7 @@ async function main() {
       data: [
         {
           name: 'Vintage Band T-Shirt',
-          itemType: 'UKAY_ITEM',
+          itemType: 'RETAIL_ITEM',
           sku: 'UKAY-TEE-001',
           category: 'Tops',
           targetCustomer: 'Unisex',
@@ -183,7 +183,7 @@ async function main() {
         },
         {
           name: 'Classic Denim Jeans',
-          itemType: 'UKAY_ITEM',
+          itemType: 'RETAIL_ITEM',
           sku: 'UKAY-JEANS-001',
           category: 'Bottoms',
           targetCustomer: 'Unisex',
@@ -200,7 +200,7 @@ async function main() {
         },
         {
           name: 'Mixed Clothing Bale',
-          itemType: 'UKAY_ITEM',
+          itemType: 'RETAIL_ITEM',
           sku: 'UKAY-BALE-001',
           category: 'Bales',
           targetCustomer: 'Unisex',
@@ -406,8 +406,8 @@ async function main() {
   // --- Ukay-only business ---
   const ukayBusiness = await prisma.business.upsert({
     where: { name: 'Ukay-Only Demo' },
-    update: { modules: ['UKAY'] },
-    create: { name: 'Ukay-Only Demo', modules: ['UKAY'] },
+    update: { modules: ['RETAIL'] },
+    create: { name: 'Ukay-Only Demo', modules: ['RETAIL'] },
   });
 
   await prisma.user.upsert({

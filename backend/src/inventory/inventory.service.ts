@@ -20,11 +20,17 @@ export class InventoryService {
       createInventoryDto.locationId,
       businessId,
     );
+    if (createInventoryDto.categoryId) {
+      await this.assertCategoryInBusiness(
+        createInventoryDto.categoryId,
+        businessId,
+      );
+    }
 
     try {
       return await this.prisma.inventoryItem.create({
         data: { ...createInventoryDto, businessId },
-        include: { location: true },
+        include: { location: true, categoryRef: true },
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -59,7 +65,7 @@ export class InventoryService {
     const [data, total] = await this.prisma.$transaction([
       this.prisma.inventoryItem.findMany({
         where,
-        include: { location: true },
+        include: { location: true, categoryRef: true },
         orderBy: { dateAdded: 'desc' },
         ...paginateQuery(page, limit),
       }),
@@ -71,7 +77,7 @@ export class InventoryService {
   async findOne(id: string, businessId: string) {
     const item = await this.prisma.inventoryItem.findFirst({
       where: { id, businessId },
-      include: { location: true },
+      include: { location: true, categoryRef: true },
     });
     if (!item) throw new NotFoundException(`Inventory item #${id} not found`);
     return item;
@@ -91,11 +97,17 @@ export class InventoryService {
         businessId,
       );
     }
+    if (updateInventoryDto.categoryId) {
+      await this.assertCategoryInBusiness(
+        updateInventoryDto.categoryId,
+        businessId,
+      );
+    }
 
     return this.prisma.inventoryItem.update({
       where: { id },
       data: updateInventoryDto,
-      include: { location: true },
+      include: { location: true, categoryRef: true },
     });
   }
 
@@ -116,6 +128,10 @@ export class InventoryService {
       .filter((i) => i.condition === 'Damaged')
       .reduce((sum, i) => sum + i.quantity, 0);
     const totalValue = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+    const totalCostValue = items.reduce(
+      (sum, i) => sum + (i.costPrice ?? i.price) * i.quantity,
+      0,
+    );
     const lowStockItems = items.filter(
       (i) => i.quantity <= (i.reorderPoint ?? 3) && i.condition !== 'Damaged',
     );
@@ -124,6 +140,7 @@ export class InventoryService {
       availableStock,
       damagedItems,
       totalValue,
+      totalCostValue,
       stockAlerts: lowStockItems.map((i) => ({
         id: i.id,
         itemName: i.name,
@@ -140,6 +157,14 @@ export class InventoryService {
       select: { id: true },
     });
     if (!location) throw new NotFoundException(`Location #${locationId} not found`);
+  }
+
+  private async assertCategoryInBusiness(categoryId: string, businessId: string) {
+    const category = await this.prisma.category.findFirst({
+      where: { id: categoryId, businessId },
+      select: { id: true },
+    });
+    if (!category) throw new NotFoundException(`Category #${categoryId} not found`);
   }
 
   private isInventoryItemType(value?: string): value is InventoryItemType {

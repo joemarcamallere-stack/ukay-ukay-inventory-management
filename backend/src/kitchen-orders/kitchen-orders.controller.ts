@@ -16,6 +16,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { CreateKitchenOrderDto } from './dto/create-kitchen-order.dto';
+import { UpdateKitchenOrderStatusDto } from './dto/update-kitchen-order-status.dto';
 import { VoidKitchenOrderDto } from './dto/void-kitchen-order.dto';
 import { KitchenOrdersService } from './kitchen-orders.service';
 
@@ -42,12 +43,14 @@ export class KitchenOrdersController {
   findAll(
     @CurrentUser() currentUser: AuthenticatedUser,
     @Query('status') status?: string,
+    @Query('locationId') locationId?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
     return this.kitchenOrdersService.findAll(
       currentUser.businessId,
       status,
+      locationId,
       page ? parseInt(page, 10) : 1,
       limit ? parseInt(limit, 10) : 50,
     );
@@ -71,6 +74,20 @@ export class KitchenOrdersController {
       id,
       voidKitchenOrderDto,
       currentUser.businessId,
+    );
+  }
+
+  @Patch(':id/status')
+  updateStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateKitchenOrderStatusDto,
+    @CurrentUser() currentUser: AuthenticatedUser,
+  ) {
+    return this.kitchenOrdersService.updateStatus(
+      id,
+      dto.status,
+      currentUser.businessId,
+      currentUser.id,
     );
   }
 }
