@@ -435,13 +435,13 @@ export default function App() {
         {/* Header */}
         <div className="p-6 flex items-center gap-3">
           <div className="bg-white rounded-full size-[40px] flex items-center justify-center shadow-sm">
-            <Package className="size-6 text-[#007A5E]" strokeWidth={2.2} />
+            <Store className="size-6 text-[#007A5E]" strokeWidth={2.2} />
           </div>
           <div>
             <p className="text-white text-[20px] leading-[28px]" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700 }}>
-              Inventra
+              CoCoders
             </p>
-            <p className="text-[#00A7A5] text-[12px] leading-[16px]" style={{ fontFamily: 'Inter, sans-serif' }}>Inventory System</p>
+            <p className="text-[#00A7A5] text-[12px] leading-[16px]" style={{ fontFamily: 'Inter, sans-serif' }}>Retail</p>
           </div>
         </div>
 
@@ -453,7 +453,7 @@ export default function App() {
               className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-[6px] text-xs font-semibold transition-colors ${activeModule === 'UKAY' ? 'bg-[#007A5E] text-white' : 'bg-[rgba(255,255,255,0.08)] text-[#a0c4bf] hover:bg-[rgba(255,255,255,0.14)]'}`}
             >
               <Store className="size-3.5" />
-              Ukay-Ukay
+              Retail
             </button>
             <button
               onClick={() => switchModule('RESTAURANT')}
