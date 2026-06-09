@@ -16,6 +16,9 @@ import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module';
 import { TransfersModule } from './transfers/transfers.module';
 import { SalesModule } from './sales/sales.module';
 import { BundlesModule } from './bundles/bundles.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { DiningTablesModule } from './dining-tables/dining-tables.module';
+import { CategoriesModule } from './categories/categories.module';
 
 @Module({
   imports: [
@@ -34,6 +37,9 @@ import { BundlesModule } from './bundles/bundles.module';
     TransfersModule,
     SalesModule,
     BundlesModule,
+    NotificationsModule,
+    DiningTablesModule,
+    CategoriesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

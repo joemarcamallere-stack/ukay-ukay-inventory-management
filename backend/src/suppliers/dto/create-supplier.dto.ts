@@ -1,4 +1,4 @@
-import { IsBoolean, IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
 
 export class CreateSupplierDto {
   @IsString()
@@ -28,6 +28,10 @@ export class CreateSupplierDto {
   @IsString()
   @MinLength(1)
   category?: string;
+
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string;
 
   @IsOptional()
   @IsBoolean()

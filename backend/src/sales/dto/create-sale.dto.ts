@@ -60,4 +60,8 @@ export class CreateSaleDto {
   @IsOptional()
   @IsString()
   customer?: string;
+
+  @IsOptional()
+  @IsUUID()
+  kitchenOrderId?: string;
 }

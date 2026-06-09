@@ -108,21 +108,21 @@ export default function App() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const hasRestaurantModule = currentUser?.modules?.includes('RESTAURANT') ?? false;
-  const hasUkayModule = currentUser?.modules?.includes('UKAY') ?? false;
+  const hasUkayModule = currentUser?.modules?.includes('RETAIL') ?? false;
   const hasBothModules = hasRestaurantModule && hasUkayModule;
-  const [activeModule, setActiveModule] = useState<'UKAY' | 'RESTAURANT'>('UKAY');
+  const [activeModule, setActiveModule] = useState<'RETAIL' | 'RESTAURANT'>('RETAIL');
 
   // When user logs in and has only RESTAURANT module, switch to it automatically
   useEffect(() => {
     if (hasRestaurantModule && !hasUkayModule) {
       setActiveModule('RESTAURANT');
     } else {
-      setActiveModule('UKAY');
+      setActiveModule('RETAIL');
     }
   }, [hasRestaurantModule, hasUkayModule]);
 
   // When switching modules, navigate to the appropriate default view
-  const switchModule = (module: 'UKAY' | 'RESTAURANT') => {
+  const switchModule = (module: 'RETAIL' | 'RESTAURANT') => {
     setActiveModule(module);
     setCurrentView(module === 'RESTAURANT' ? 'restaurant-dashboard' : 'dashboard');
   };
@@ -155,8 +155,11 @@ export default function App() {
 
     const loadPhaseOneData = async () => {
       try {
+        const inventoryRequest = hasUkayModule
+          ? getInventory({ itemType: 'RETAIL_ITEM' })
+          : Promise.resolve([]);
         const [inventoryData, locationData] = await Promise.all([
-          getInventory({ itemType: 'UKAY_ITEM' }),
+          inventoryRequest,
           getLocations()
         ]);
 
@@ -173,7 +176,7 @@ export default function App() {
     };
 
     loadPhaseOneData();
-  }, [isLoggedIn, currentUser?.role]);
+  }, [isLoggedIn, currentUser?.role, hasUkayModule]);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -420,7 +423,7 @@ export default function App() {
         setCurrentView={setCurrentView}
         currentUser={currentUser}
         hasBothModules={hasBothModules}
-        onSwitchToUkay={() => switchModule('UKAY')}
+        onSwitchToUkay={() => switchModule('RETAIL')}
         onLogout={handleLogout}
         users={users}
         setUsers={setUsers}
@@ -449,8 +452,8 @@ export default function App() {
         {hasBothModules && (
           <div className="px-4 pb-3 flex gap-2">
             <button
-              onClick={() => switchModule('UKAY')}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-[6px] text-xs font-semibold transition-colors ${activeModule === 'UKAY' ? 'bg-[#007A5E] text-white' : 'bg-[rgba(255,255,255,0.08)] text-[#a0c4bf] hover:bg-[rgba(255,255,255,0.14)]'}`}
+              onClick={() => switchModule('RETAIL')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-[6px] text-xs font-semibold transition-colors ${activeModule === 'RETAIL' ? 'bg-[#007A5E] text-white' : 'bg-[rgba(255,255,255,0.08)] text-[#a0c4bf] hover:bg-[rgba(255,255,255,0.14)]'}`}
             >
               <Store className="size-3.5" />
               Retail
@@ -467,8 +470,8 @@ export default function App() {
 
         {/* Navigation */}
         <nav className="flex-1 px-6 pb-4 overflow-y-auto scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-          {/* Ukay-Ukay nav â€” shown when activeModule is UKAY or business has only UKAY */}
-          {activeModule === 'UKAY' && (
+          {/* Retail navigation */}
+          {activeModule === 'RETAIL' && (
             <>
               <NavButton active={currentView === 'dashboard'} onClick={() => setCurrentView('dashboard')}>
                 <DashboardIcon />

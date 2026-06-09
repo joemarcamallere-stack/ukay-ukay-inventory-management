@@ -20,7 +20,7 @@ describe('BusinessModulesGuard', () => {
       .mockReturnValue(['RESTAURANT']);
     const guard = new BusinessModulesGuard(reflector);
 
-    expect(guard.canActivate(createContext(['UKAY', 'RESTAURANT']))).toBe(true);
+    expect(guard.canActivate(createContext(['RETAIL', 'RESTAURANT']))).toBe(true);
   });
 
   it('blocks requests when a required module is missing', () => {
@@ -30,7 +30,7 @@ describe('BusinessModulesGuard', () => {
       .mockReturnValue(['RESTAURANT']);
     const guard = new BusinessModulesGuard(reflector);
 
-    expect(guard.canActivate(createContext(['UKAY']))).toBe(false);
+    expect(guard.canActivate(createContext(['RETAIL']))).toBe(false);
   });
 
   it('allows requests with no module metadata', () => {
