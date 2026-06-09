@@ -111,7 +111,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                 <div className="relative shrink-0 w-[208.65px]">
                   <div className="bg-clip-padding border-0 border-[transparent] border-solid content-stretch flex flex-col items-start relative size-full">
                     <p className="font-['Poppins',sans-serif] font-bold leading-[32px] text-[24px] text-white whitespace-nowrap" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
-                      Inventra
+                      CoCoders
                     </p>
                     <p className="font-['Inter',sans-serif] font-normal leading-[20px] text-[14px] text-[rgba(255,255,255,0.95)] whitespace-nowrap" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>
                       Inventory Management System

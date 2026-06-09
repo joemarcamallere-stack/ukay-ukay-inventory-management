@@ -49,11 +49,11 @@ export function Layout() {
         <div className="p-6 border-b border-sidebar-border">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-full overflow-hidden bg-white shadow-lg flex-shrink-0">
-              <img src={logoImage} alt="CoCoders Logo" className="w-full h-full object-cover" />
+              <img src={logoImage} alt="Cocoder Logo" className="w-full h-full object-cover" />
             </div>
             <div>
-              <h1 className="text-xl font-bold">CoCoders</h1>
-              <p className="text-xs text-sidebar-foreground/70">Food Inventory</p>
+              <h1 className="text-xl font-bold">Cocoder</h1>
+              <p className="text-xs text-sidebar-foreground/70">Restaurant</p>
             </div>
           </div>
         </div>

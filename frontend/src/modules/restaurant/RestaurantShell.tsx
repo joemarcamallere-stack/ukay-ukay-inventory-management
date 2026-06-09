@@ -16,9 +16,9 @@ import {
   User,
   ReceiptText,
   Store,
+  UtensilsCrossed,
 } from 'lucide-react';
 import { MemoryRouter } from 'react-router';
-import restaurantLogo from '../../imports/12a1de61-2780-4cbc-a843-0bf1eeabc835.png';
 import { Dashboard } from './Dashboard';
 import { StockControl } from './StockControl';
 import { Inventory } from './Inventory';
@@ -139,12 +139,12 @@ export default function RestaurantShell({
       <aside className="w-64 bg-sidebar text-sidebar-foreground flex flex-col shadow-xl border-r border-sidebar-border">
         <div className="p-6 border-b border-sidebar-border">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full overflow-hidden bg-white shadow-lg flex-shrink-0">
-              <img src={restaurantLogo} alt="CoCoders Logo" className="w-full h-full object-cover" />
+            <div className="w-12 h-12 rounded-full bg-white shadow-lg flex-shrink-0 flex items-center justify-center">
+              <UtensilsCrossed className="w-7 h-7 text-primary" strokeWidth={2.2} />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-sidebar-foreground">CoCoders</h1>
-              <p className="text-xs text-sidebar-foreground/70">Food Inventory</p>
+              <h1 className="text-xl font-bold" style={{ color: '#F8FAFB' }}>Cocoders</h1>
+              <p className="text-xs text-sidebar-foreground/70">Restaurant</p>
             </div>
           </div>
         </div>
@@ -157,7 +157,7 @@ export default function RestaurantShell({
               className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all duration-200"
             >
               <Store className="w-5 h-5" />
-              <span className="text-sm font-medium">Back to Ukay-Ukay</span>
+              <span className="text-sm font-medium">Back to Retail</span>
             </button>
           </div>
         )}
