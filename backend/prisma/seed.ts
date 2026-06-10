@@ -12,18 +12,18 @@ async function main() {
   const staffPasswordHash = await bcrypt.hash('staff123', 12);
 
   const business = await prisma.business.upsert({
-    where: { name: 'Ukay + Restaurant Demo' },
+    where: { name: 'Retail + Restaurant Demo' },
     update: {
-      modules: ['UKAY', 'RESTAURANT'],
+      modules: ['RETAIL', 'RESTAURANT'],
     },
     create: {
-      name: 'Ukay + Restaurant Demo',
-      modules: ['UKAY', 'RESTAURANT'],
+      name: 'Retail + Restaurant Demo',
+      modules: ['RETAIL', 'RESTAURANT'],
     },
   });
 
   await prisma.user.upsert({
-    where: { email: 'admin@ukayukay.com' },
+    where: { email: 'admin@retaildemo.com' },
     update: {
       name: 'Admin User',
       role: 'Admin',
@@ -33,7 +33,7 @@ async function main() {
     },
     create: {
       name: 'Admin User',
-      email: 'admin@ukayukay.com',
+      email: 'admin@retaildemo.com',
       role: 'Admin',
       status: 'Active',
       passwordHash: adminPasswordHash,
@@ -42,7 +42,7 @@ async function main() {
   });
 
   await prisma.user.upsert({
-    where: { email: 'staff@ukayukay.com' },
+    where: { email: 'staff@retaildemo.com' },
     update: {
       name: 'Staff User',
       role: 'Staff',
@@ -52,7 +52,7 @@ async function main() {
     },
     create: {
       name: 'Staff User',
-      email: 'staff@ukayukay.com',
+      email: 'staff@retaildemo.com',
       role: 'Staff',
       status: 'Active',
       passwordHash: staffPasswordHash,
@@ -166,8 +166,8 @@ async function main() {
       data: [
         {
           name: 'Vintage Band T-Shirt',
-          itemType: 'UKAY_ITEM',
-          sku: 'UKAY-TEE-001',
+          itemType: 'RETAIL_ITEM',
+          sku: 'RTL-TEE-001',
           category: 'Tops',
           targetCustomer: 'Unisex',
           subcategory: 'T-Shirts',
@@ -183,8 +183,8 @@ async function main() {
         },
         {
           name: 'Classic Denim Jeans',
-          itemType: 'UKAY_ITEM',
-          sku: 'UKAY-JEANS-001',
+          itemType: 'RETAIL_ITEM',
+          sku: 'RTL-JEANS-001',
           category: 'Bottoms',
           targetCustomer: 'Unisex',
           subcategory: 'Jeans',
@@ -199,10 +199,10 @@ async function main() {
           businessId: business.id,
         },
         {
-          name: 'Mixed Clothing Bale',
-          itemType: 'UKAY_ITEM',
-          sku: 'UKAY-BALE-001',
-          category: 'Bales',
+          name: 'Mixed Clothing Lot',
+          itemType: 'RETAIL_ITEM',
+          sku: 'RTL-MIX-001',
+          category: 'Mixed Lots',
           targetCustomer: 'Unisex',
           subcategory: 'Mixed Clothing',
           size: 'Assorted',
@@ -403,25 +403,41 @@ async function main() {
     ],
   });
 
-  // --- Ukay-only business ---
+  // --- Retail-only business ---
   const ukayBusiness = await prisma.business.upsert({
-    where: { name: 'Ukay-Only Demo' },
-    update: { modules: ['UKAY'] },
-    create: { name: 'Ukay-Only Demo', modules: ['UKAY'] },
+    where: { name: 'Retail-Only Demo' },
+    update: { modules: ['RETAIL'] },
+    create: { name: 'Retail-Only Demo', modules: ['RETAIL'] },
   });
 
-  await prisma.user.upsert({
+  const legacyRetailAdmin = await prisma.user.findUnique({
     where: { email: 'admin@ukay.com' },
+    select: { id: true },
+  });
+  const currentRetailAdmin = await prisma.user.findUnique({
+    where: { email: 'admin@retail.com' },
+    select: { id: true },
+  });
+
+  if (legacyRetailAdmin && !currentRetailAdmin) {
+    await prisma.user.update({
+      where: { id: legacyRetailAdmin.id },
+      data: { email: 'admin@retail.com' },
+    });
+  }
+
+  await prisma.user.upsert({
+    where: { email: 'admin@retail.com' },
     update: {
-      name: 'Ukay Admin',
+      name: 'Retail Admin',
       role: 'Admin',
       status: 'Active',
       passwordHash: adminPasswordHash,
       businessId: ukayBusiness.id,
     },
     create: {
-      name: 'Ukay Admin',
-      email: 'admin@ukay.com',
+      name: 'Retail Admin',
+      email: 'admin@retail.com',
       role: 'Admin',
       status: 'Active',
       passwordHash: adminPasswordHash,
@@ -431,11 +447,11 @@ async function main() {
 
   await prisma.location.upsert({
     where: { businessId_name: { businessId: ukayBusiness.id, name: 'Main Store' } },
-    update: { address: 'Downtown', manager: 'Ukay Admin', phone: '+63 900 100 0001' },
+    update: { address: 'Downtown', manager: 'Retail Admin', phone: '+63 900 100 0001' },
     create: {
       name: 'Main Store',
       address: 'Downtown',
-      manager: 'Ukay Admin',
+      manager: 'Retail Admin',
       phone: '+63 900 100 0001',
       businessId: ukayBusiness.id,
     },

@@ -119,6 +119,20 @@ export class SalesService {
         itemMap.set(item.id, { ...item, quantity: newQuantity });
       }
 
+      if (dto.kitchenOrderId) {
+        const kitchenOrder = await tx.kitchenOrder.findFirst({
+          where: { id: dto.kitchenOrderId, businessId },
+        });
+        if (!kitchenOrder) {
+          throw new NotFoundException(`Kitchen order #${dto.kitchenOrderId} not found`);
+        }
+        await tx.kitchenOrder.update({
+          where: { id: dto.kitchenOrderId },
+          data: { saleId: sale.id },
+        });
+        sale = await tx.sale.findUnique({ where: { id: sale.id }, include: this.saleInclude }) as any;
+      }
+
       return sale;
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
@@ -224,5 +238,6 @@ export class SalesService {
     location: true,
     cashier: { select: { id: true, name: true } },
     items: { include: { inventoryItem: true } },
+    kitchenOrder: { select: { id: true, receiptNo: true, status: true } },
   };
 }

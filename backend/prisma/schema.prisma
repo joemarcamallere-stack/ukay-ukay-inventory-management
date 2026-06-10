@@ -12,12 +12,35 @@ datasource db {
 }
 
 enum BusinessModule {
-  UKAY
+  RETAIL
   RESTAURANT
 }
 
+enum UserRole {
+  Admin
+  Manager
+  Staff
+  Cashier
+  KitchenStaff
+  RetailStaff
+}
+
+enum UserStatus {
+  Active
+  Inactive
+}
+
+enum NotificationType {
+  LOW_STOCK
+  EXPIRY_WARNING
+  EXPIRY_REACHED
+  BUNDLE_APPROVED
+  BUNDLE_REJECTED
+  KITCHEN_ORDER_READY
+}
+
 enum InventoryItemType {
-  UKAY_ITEM
+  RETAIL_ITEM
   INGREDIENT
   MENU_ITEM
   SUPPLY
@@ -27,7 +50,7 @@ enum InventoryItemType {
 model Business {
   id        String           @id @default(uuid())
   name      String           @unique
-  modules   BusinessModule[] @default([UKAY])
+  modules   BusinessModule[] @default([RETAIL])
   users     User[]
   locations Location[]
   items     InventoryItem[]
@@ -39,6 +62,9 @@ model Business {
   transfers      Transfer[]
   sales          Sale[]
   bundles        BundlePackage[]
+  diningTables   DiningTable[]
+  notifications  Notification[]
+  categories     Category[]
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
 }
@@ -48,8 +74,8 @@ model User {
   name      String
   email     String   @unique
   passwordHash String
-  role      String   // Admin, Manager, Staff
-  status    String   // Active, Inactive
+  role      UserRole   @default(Staff)
+  status    UserStatus @default(Active)
   businessId String
   business   Business @relation(fields: [businessId], references: [id])
   stockMovements StockMovement[]
@@ -60,6 +86,7 @@ model User {
   sales                  Sale[]
   createdBundles         BundlePackage[]  @relation("BundleCreatedBy")
   approvedBundles        BundlePackage[]  @relation("BundleApprovedBy")
+  notifications  Notification[]
   lastLogin DateTime @default(now())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -79,24 +106,88 @@ model Location {
   transfersFrom  Transfer[] @relation("TransferFrom")
   transfersTo    Transfer[] @relation("TransferTo")
   sales          Sale[]
+  bundles        BundlePackage[]
+  kitchenOrders  KitchenOrder[]
+  diningTables   DiningTable[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([businessId, name])
 }
 
+model Category {
+  id          String         @id @default(uuid())
+  name        String
+  description String?
+  module      BusinessModule
+  businessId  String
+  business    Business       @relation(fields: [businessId], references: [id])
+  items       InventoryItem[]
+  suppliers   Supplier[]     @relation("SupplierCategory")
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([businessId, name, module])
+  @@index([businessId, module])
+}
+
+model DiningTable {
+  id          String            @id @default(uuid())
+  tableNumber String
+  capacity    Int
+  status      DiningTableStatus @default(AVAILABLE)
+  floor       String?
+  notes       String?
+  locationId  String
+  location    Location          @relation(fields: [locationId], references: [id])
+  businessId  String
+  business    Business          @relation(fields: [businessId], references: [id])
+  kitchenOrders KitchenOrder[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@unique([businessId, locationId, tableNumber])
+  @@index([businessId, status])
+  @@index([locationId])
+}
+
+model Notification {
+  id         String           @id @default(uuid())
+  type       NotificationType
+  title      String
+  message    String
+  isRead     Boolean          @default(false)
+  readAt     DateTime?
+  entityType String?
+  entityId   String?
+  userId     String
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business         @relation(fields: [businessId], references: [id])
+  createdAt  DateTime         @default(now())
+
+  @@index([userId, isRead])
+  @@index([businessId, createdAt])
+  @@index([userId, createdAt])
+}
+
 model InventoryItem {
   id             String   @id @default(uuid())
   name           String
-  itemType       InventoryItemType @default(UKAY_ITEM)
+  itemType       InventoryItemType @default(RETAIL_ITEM)
   sku            String?
+  barcode        String?
   category       String
+  categoryId     String?
+  categoryRef    Category?         @relation(fields: [categoryId], references: [id])
   targetCustomer String?  // Male, Female, Unisex
   subcategory    String?
   size           String?
   condition      String?  // Excellent, Good, Fair, Damaged
   quantity       Float    @default(0.0)
   price          Float    @default(0.0)
+  costPrice      Float?
+  imageUrl       String?
   unit           String?
   minStock       Float?
   maxStock       Float?
@@ -122,6 +213,7 @@ model InventoryItem {
   @@index([businessId, itemType])
   @@index([businessId, locationId])
   @@unique([businessId, sku])
+  @@unique([businessId, barcode])
 }
 
 model Recipe {
@@ -135,6 +227,14 @@ model Recipe {
   targetFoodCost  Float?
   sellingPrice    Float?
   isActive        Boolean            @default(true)
+  imageUrl        String?
+  isVegetarian    Boolean            @default(false)
+  isVegan         Boolean            @default(false)
+  isGlutenFree    Boolean            @default(false)
+  isDairyFree     Boolean            @default(false)
+  isNutFree       Boolean            @default(false)
+  isHalal         Boolean            @default(false)
+  allergenNotes   String?
   menuItemId      String?
   menuItem        InventoryItem?     @relation("RecipeMenuItem", fields: [menuItemId], references: [id])
   ingredients     RecipeIngredient[]
@@ -165,7 +265,17 @@ model RecipeIngredient {
   @@index([itemId])
 }
 
+enum DiningTableStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+  CLEANING
+}
+
 enum KitchenOrderStatus {
+  PENDING
+  PREPARING
+  READY
   COMPLETED
   VOIDED
 }
@@ -180,6 +290,12 @@ model KitchenOrder {
   voidedAt    DateTime?
   recipeId    String
   recipe      Recipe             @relation(fields: [recipeId], references: [id])
+  locationId  String?
+  location    Location?          @relation(fields: [locationId], references: [id])
+  tableId     String?
+  table       DiningTable?       @relation(fields: [tableId], references: [id])
+  saleId      String?            @unique
+  sale        Sale?              @relation(fields: [saleId], references: [id])
   businessId  String
   business    Business           @relation(fields: [businessId], references: [id])
   completedById String?
@@ -243,6 +359,8 @@ model Supplier {
   phone         String?
   address       String?
   category      String?
+  categoryId    String?
+  categoryRef   Category?       @relation("SupplierCategory", fields: [categoryId], references: [id])
   isActive      Boolean         @default(true)
   businessId    String
   business      Business        @relation(fields: [businessId], references: [id])
@@ -377,6 +495,7 @@ model Sale {
   customer          String?
   status            SaleStatus @default(COMPLETED)
   refundReason      String?
+  kitchenOrder      KitchenOrder?
   businessId        String
   business          Business   @relation(fields: [businessId], references: [id])
   items             SaleItem[]
@@ -417,10 +536,14 @@ enum BundleStatus {
 model BundlePackage {
   id              String       @id @default(uuid())
   name            String
+  description     String?
+  imageUrl        String?
   discount        Float        @default(0)
   price           Float        @default(0)
   status          BundleStatus @default(PENDING)
   rejectionReason String?
+  locationId      String?
+  location        Location?    @relation(fields: [locationId], references: [id])
   businessId      String
   business        Business     @relation(fields: [businessId], references: [id])
   createdById     String?

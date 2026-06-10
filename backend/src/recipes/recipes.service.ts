@@ -18,7 +18,7 @@ export class RecipesService {
     await this.assertRecipeItemsInBusiness(createRecipeDto, businessId);
 
     try {
-      return await this.prisma.recipe.create({
+      const recipe = await this.prisma.recipe.create({
         data: {
           name: createRecipeDto.name,
           category: createRecipeDto.category,
@@ -29,6 +29,14 @@ export class RecipesService {
           targetFoodCost: createRecipeDto.targetFoodCost,
           sellingPrice: createRecipeDto.sellingPrice,
           isActive: createRecipeDto.isActive ?? true,
+          imageUrl: createRecipeDto.imageUrl,
+          isVegetarian: createRecipeDto.isVegetarian,
+          isVegan: createRecipeDto.isVegan,
+          isGlutenFree: createRecipeDto.isGlutenFree,
+          isDairyFree: createRecipeDto.isDairyFree,
+          isNutFree: createRecipeDto.isNutFree,
+          isHalal: createRecipeDto.isHalal,
+          allergenNotes: createRecipeDto.allergenNotes,
           menuItemId: createRecipeDto.menuItemId,
           businessId,
           ingredients: {
@@ -37,6 +45,7 @@ export class RecipesService {
         },
         include: this.recipeInclude,
       });
+      return this.computeIngredientCosts(recipe);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         throw new ConflictException(`A recipe named "${createRecipeDto.name}" already exists`);
@@ -65,7 +74,8 @@ export class RecipesService {
       }),
       this.prisma.recipe.count({ where }),
     ]);
-    return paginate(data, total, page, limit);
+    const result = paginate(data, total, page, limit);
+    return { ...result, data: result.data.map((r) => this.computeIngredientCosts(r)) };
   }
 
   async findOne(id: string, businessId: string) {
@@ -74,7 +84,7 @@ export class RecipesService {
       include: this.recipeInclude,
     });
     if (!recipe) throw new NotFoundException(`Recipe #${id} not found`);
-    return recipe;
+    return this.computeIngredientCosts(recipe);
   }
 
   async update(id: string, updateRecipeDto: UpdateRecipeDto, businessId: string) {
@@ -86,7 +96,7 @@ export class RecipesService {
         await tx.recipeIngredient.deleteMany({ where: { recipeId: id } });
       }
 
-      return tx.recipe.update({
+      const updated = await tx.recipe.update({
         where: { id },
         data: {
           name: updateRecipeDto.name,
@@ -98,6 +108,14 @@ export class RecipesService {
           targetFoodCost: updateRecipeDto.targetFoodCost,
           sellingPrice: updateRecipeDto.sellingPrice,
           isActive: updateRecipeDto.isActive,
+          imageUrl: updateRecipeDto.imageUrl,
+          isVegetarian: updateRecipeDto.isVegetarian,
+          isVegan: updateRecipeDto.isVegan,
+          isGlutenFree: updateRecipeDto.isGlutenFree,
+          isDairyFree: updateRecipeDto.isDairyFree,
+          isNutFree: updateRecipeDto.isNutFree,
+          isHalal: updateRecipeDto.isHalal,
+          allergenNotes: updateRecipeDto.allergenNotes,
           menuItemId: updateRecipeDto.menuItemId,
           ...(updateRecipeDto.ingredients
             ? {
@@ -109,6 +127,7 @@ export class RecipesService {
         },
         include: this.recipeInclude,
       });
+      return this.computeIngredientCosts(updated);
     });
   }
 
@@ -148,7 +167,7 @@ export class RecipesService {
       where: {
         businessId,
         id: { in: Array.from(new Set(itemIds)) },
-        itemType: 'UKAY_ITEM',
+        itemType: 'RETAIL_ITEM',
       },
       select: { name: true },
     });
@@ -175,6 +194,18 @@ export class RecipesService {
           ? ingredient.unitCost * ingredient.quantity
           : undefined,
     }));
+  }
+
+  private computeIngredientCosts(recipe: any) {
+    return {
+      ...recipe,
+      ingredients: recipe.ingredients.map((ing: any) => ({
+        ...ing,
+        computedUnitCost: ing.unitCost ?? ing.item.costPrice ?? ing.item.price,
+        computedTotalCost:
+          (ing.unitCost ?? ing.item.costPrice ?? ing.item.price) * ing.quantity,
+      })),
+    };
   }
 
   private readonly recipeInclude = {

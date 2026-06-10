@@ -1,7 +1,9 @@
 import {
   IsArray,
   IsNumber,
+  IsOptional,
   IsString,
+  IsUrl,
   IsUUID,
   Min,
   MinLength,
@@ -23,9 +25,21 @@ export class CreateBundleDto {
   @MinLength(1)
   name: string;
 
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsUrl()
+  imageUrl?: string;
+
   @IsNumber()
   @Min(0)
   discount: number;
+
+  @IsOptional()
+  @IsUUID()
+  locationId?: string;
 
   @IsArray()
   @ValidateNested({ each: true })

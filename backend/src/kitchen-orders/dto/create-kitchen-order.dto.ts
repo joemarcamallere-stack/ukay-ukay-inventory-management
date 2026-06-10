@@ -1,4 +1,5 @@
 import {
+  IsIn,
   IsNumber,
   IsOptional,
   IsString,
@@ -6,6 +7,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { KitchenOrderStatus } from '@prisma/client';
 
 export class CreateKitchenOrderDto {
   @IsString()
@@ -22,4 +24,16 @@ export class CreateKitchenOrderDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsUUID()
+  locationId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  tableId?: string;
+
+  @IsOptional()
+  @IsIn([KitchenOrderStatus.PENDING, KitchenOrderStatus.COMPLETED])
+  status?: KitchenOrderStatus;
 }

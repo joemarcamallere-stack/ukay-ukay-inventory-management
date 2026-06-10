@@ -138,7 +138,14 @@ export function deleteRecipe(id: string) {
   });
 }
 
-export function getKitchenOrders(params?: { status?: 'COMPLETED' | 'VOIDED' }) {
+export type KitchenOrderStatus =
+  | 'PENDING'
+  | 'PREPARING'
+  | 'READY'
+  | 'COMPLETED'
+  | 'VOIDED';
+
+export function getKitchenOrders(params?: { status?: KitchenOrderStatus }) {
   const query = new URLSearchParams();
   if (params?.status) query.set('status', params.status);
   const suffix = query.toString() ? `?${query.toString()}` : '';
@@ -156,6 +163,13 @@ export function voidKitchenOrder(id: string, voidReason: string) {
   return request<any>(`/api/kitchen-orders/${id}/void`, {
     method: 'PATCH',
     body: JSON.stringify({ voidReason }),
+  });
+}
+
+export function updateKitchenOrderStatus(id: string, status: KitchenOrderStatus) {
+  return request<any>(`/api/kitchen-orders/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
   });
 }
 

@@ -7,7 +7,7 @@ export type RestaurantLocation = {
 export type RestaurantInventoryItem = {
   id: string;
   name: string;
-  itemType?: 'UKAY_ITEM' | 'INGREDIENT' | 'MENU_ITEM' | 'SUPPLY' | 'BUNDLE';
+  itemType?: 'RETAIL_ITEM' | 'INGREDIENT' | 'MENU_ITEM' | 'SUPPLY' | 'BUNDLE';
   sku?: string | null;
   category: string;
   quantity: number;

@@ -26,7 +26,7 @@ import type { AuthenticatedUser } from '../auth/current-user.decorator';
 @Controller('bundles')
 @UseGuards(JwtAuthGuard, RolesGuard, BusinessModulesGuard)
 @Roles('Admin', 'Manager', 'Staff')
-@RequiredBusinessModules('UKAY')
+@RequiredBusinessModules('RETAIL')
 export class BundlesController {
   constructor(private readonly bundlesService: BundlesService) {}
 
@@ -39,12 +39,14 @@ export class BundlesController {
   findAll(
     @CurrentUser() user: AuthenticatedUser,
     @Query('status') status?: string,
+    @Query('locationId') locationId?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
     return this.bundlesService.findAll(
       user.businessId,
       status,
+      locationId,
       page ? parseInt(page, 10) : 1,
       limit ? parseInt(limit, 10) : 50,
     );

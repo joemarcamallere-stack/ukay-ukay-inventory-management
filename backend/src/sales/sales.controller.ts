@@ -22,7 +22,7 @@ import type { AuthenticatedUser } from '../auth/current-user.decorator';
 @Controller('sales')
 @UseGuards(JwtAuthGuard, RolesGuard, BusinessModulesGuard)
 @Roles('Admin', 'Manager', 'Staff')
-@RequiredBusinessModules('UKAY')
+@RequiredBusinessModules('RETAIL')
 export class SalesController {
   constructor(private readonly salesService: SalesService) {}
 

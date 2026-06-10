@@ -15,9 +15,13 @@ export class SuppliersService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateSupplierDto, businessId: string) {
+    if (dto.categoryId) {
+      await this.assertCategoryInBusiness(dto.categoryId, businessId);
+    }
     try {
       return await this.prisma.supplier.create({
         data: { ...dto, businessId },
+        include: { categoryRef: true },
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -40,6 +44,7 @@ export class SuppliersService {
     const [data, total] = await this.prisma.$transaction([
       this.prisma.supplier.findMany({
         where,
+        include: { categoryRef: true },
         orderBy: { name: 'asc' },
         ...paginateQuery(page, limit),
       }),
@@ -49,15 +54,18 @@ export class SuppliersService {
   }
 
   async findOne(id: string, businessId: string) {
-    const supplier = await this.prisma.supplier.findFirst({ where: { id, businessId } });
+    const supplier = await this.prisma.supplier.findFirst({ where: { id, businessId }, include: { categoryRef: true } });
     if (!supplier) throw new NotFoundException(`Supplier #${id} not found`);
     return supplier;
   }
 
   async update(id: string, dto: UpdateSupplierDto, businessId: string) {
     await this.findOne(id, businessId);
+    if (dto.categoryId) {
+      await this.assertCategoryInBusiness(dto.categoryId, businessId);
+    }
     try {
-      return await this.prisma.supplier.update({ where: { id }, data: dto });
+      return await this.prisma.supplier.update({ where: { id }, data: dto, include: { categoryRef: true } });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         throw new ConflictException(`Supplier name "${dto.name}" already exists`);
@@ -73,5 +81,13 @@ export class SuppliersService {
       throw new BadRequestException('Cannot delete supplier with existing purchase orders');
     }
     return this.prisma.supplier.delete({ where: { id } });
+  }
+
+  private async assertCategoryInBusiness(categoryId: string, businessId: string) {
+    const category = await this.prisma.category.findFirst({
+      where: { id: categoryId, businessId },
+      select: { id: true },
+    });
+    if (!category) throw new NotFoundException(`Category #${categoryId} not found`);
   }
 }

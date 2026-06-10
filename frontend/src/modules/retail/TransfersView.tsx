@@ -63,7 +63,7 @@ export default function TransfersView({
       const [transfersData, locationsData, inventoryData] = await Promise.all([
         getTransfers(),
         getLocations(),
-        getInventory({ itemType: 'UKAY_ITEM' }),
+        getInventory({ itemType: 'RETAIL_ITEM' }),
       ]);
       setTransfers(transfersData);
       setLocations(locationsData);

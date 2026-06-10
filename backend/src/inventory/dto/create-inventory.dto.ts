@@ -4,6 +4,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUrl,
   IsUUID,
   Min,
   MinLength,
@@ -24,7 +25,7 @@ export enum InventoryCondition {
 }
 
 export enum InventoryItemType {
-  UkayItem = 'UKAY_ITEM',
+  RetailItem = 'RETAIL_ITEM',
   Ingredient = 'INGREDIENT',
   MenuItem = 'MENU_ITEM',
   Supply = 'SUPPLY',
@@ -44,6 +45,11 @@ export class CreateInventoryDto {
   @IsString()
   @MinLength(1)
   sku?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  barcode?: string;
 
   @IsString()
   @MinLength(2)
@@ -74,6 +80,15 @@ export class CreateInventoryDto {
   @IsNumber()
   @Min(0)
   price!: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  costPrice?: number;
+
+  @IsOptional()
+  @IsUrl()
+  imageUrl?: string;
 
   @IsOptional()
   @IsString()
@@ -107,4 +122,8 @@ export class CreateInventoryDto {
 
   @IsUUID()
   locationId!: string;
+
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string;
 }
