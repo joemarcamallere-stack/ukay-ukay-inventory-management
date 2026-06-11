@@ -235,6 +235,21 @@ export function createCategory(data: unknown) {
   });
 }
 
+export type RestaurantSettingKey =
+  | 'CATEGORY_HIERARCHY'
+  | 'STORAGE_TEMPERATURE_OPTIONS';
+
+export function getRestaurantSettings() {
+  return request<Array<{ key: RestaurantSettingKey; value: unknown }>>('/api/restaurant-settings');
+}
+
+export function upsertRestaurantSetting(key: RestaurantSettingKey, value: unknown) {
+  return request<any>(`/api/restaurant-settings/${key}`, {
+    method: 'PUT',
+    body: JSON.stringify({ value }),
+  });
+}
+
 // ─── Suppliers ───────────────────────────────────────────────────────────────
 
 export function getSuppliers(params?: { isActive?: boolean }) {

@@ -28,7 +28,8 @@ export interface PurchaseOrder {
   orderNumber: string;
   supplier: string;
   date: string;
-  status: 'Pending' | 'Approved' | 'Received' | 'Cancelled';
+  status: 'Pending' | 'Approved' | 'Received' | 'Rejected' | 'Cancelled';
+  createdBy?: string;
   items: { name: string; quantity: number; price: number }[];
   totalAmount: number;
   paymentMethod?: 'Cash' | 'Bank Transfer' | 'Check' | 'Credit Terms';
@@ -393,7 +394,7 @@ export function generateSampleData(): InventoryItem[] {
       name,
       category: 'Shoes',
       
-      gender: 'Unisex',
+      targetCustomer: 'Unisex',
       subcategory: 'Sneakers',
       size: ['7', '8', '9', '10', '11'][Math.floor(Math.random() * 5)],
       condition: ['Excellent', 'Good', 'Fair'][Math.floor(Math.random() * 3)] as any,
@@ -415,7 +416,7 @@ export function generateSampleData(): InventoryItem[] {
       name,
       category: 'Shoes',
       
-      gender: 'Unisex',
+      targetCustomer: 'Unisex',
       subcategory: 'Boots',
       size: ['7', '8', '9', '10'][Math.floor(Math.random() * 4)],
       condition: ['Excellent', 'Good', 'Fair'][Math.floor(Math.random() * 3)] as any,
@@ -437,7 +438,7 @@ export function generateSampleData(): InventoryItem[] {
       name,
       category: 'Shoes',
       
-      gender: 'Unisex',
+      targetCustomer: 'Unisex',
       subcategory: 'Sandals',
       size: ['7', '8', '9', '10'][Math.floor(Math.random() * 4)],
       condition: ['Excellent', 'Good'][Math.floor(Math.random() * 2)] as any,
@@ -459,7 +460,7 @@ export function generateSampleData(): InventoryItem[] {
       name,
       category: 'Accessories',
       
-      gender: 'Unisex',
+      targetCustomer: 'Unisex',
       subcategory: 'Bags',
       size: 'One Size',
       condition: ['Excellent', 'Good', 'Fair'][Math.floor(Math.random() * 3)] as any,
@@ -480,7 +481,7 @@ export function generateSampleData(): InventoryItem[] {
       name,
       category: 'Accessories',
       
-      gender: 'Unisex',
+      targetCustomer: 'Unisex',
       subcategory: 'Hats',
       size: 'One Size',
       condition: ['Excellent', 'Good'][Math.floor(Math.random() * 2)] as any,
@@ -717,8 +718,10 @@ export interface ProductReceived {
   id: string;
   receiptNumber: string;
   poNumber: string;
+  poId?: string;
   supplier: string;
   dateReceived: string;
+  receivedDate?: string;
   items: {
     name: string;
     orderedQty: number;
@@ -733,7 +736,7 @@ export interface ProductReceived {
     price: number;
   }[];
   receivedBy: string;
-  status: 'Pending Inspection' | 'Partially Accepted' | 'Fully Accepted';
+  status: 'Pending Inspection' | 'Partially Accepted' | 'Fully Accepted' | 'Completed';
   totalOrdered: number;
   totalAccepted: number;
   totalRejected: number;

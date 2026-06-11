@@ -66,15 +66,16 @@ export class PurchaseOrdersService {
       ...(status ? { status: status as any } : {}),
       ...(supplierId ? { supplierId } : {}),
     };
-    const [data, total] = await this.prisma.$transaction([
-      this.prisma.purchaseOrder.findMany({
+    const [data, total] = await this.prisma.$transaction(async (tx) => {
+      const data = await tx.purchaseOrder.findMany({
         where,
         include: this.poInclude,
         orderBy: { createdAt: 'desc' },
         ...paginateQuery(page, limit),
-      }),
-      this.prisma.purchaseOrder.count({ where }),
-    ]);
+      });
+      const total = await tx.purchaseOrder.count({ where });
+      return [data, total] as const;
+    });
     return paginate(data, total, page, limit);
   }
 
@@ -316,15 +317,16 @@ export class PurchaseOrdersService {
         },
       },
     };
-    const [data, total] = await this.prisma.$transaction([
-      this.prisma.goodsReceipt.findMany({
+    const [data, total] = await this.prisma.$transaction(async (tx) => {
+      const data = await tx.goodsReceipt.findMany({
         where,
         include,
         orderBy: { createdAt: 'desc' },
         ...paginateQuery(page, limit),
-      }),
-      this.prisma.goodsReceipt.count({ where }),
-    ]);
+      });
+      const total = await tx.goodsReceipt.count({ where });
+      return [data, total] as const;
+    });
     return paginate(data, total, page, limit);
   }
 

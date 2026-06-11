@@ -66,8 +66,22 @@ model Business {
   diningTables   DiningTable[]
   notifications  Notification[]
   categories     Category[]
+  restaurantSettings RestaurantSetting[]
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
+}
+
+model RestaurantSetting {
+  id         String   @id @default(uuid())
+  key        String
+  value      Json
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([businessId, key])
+  @@index([businessId])
 }
 
 model User {
