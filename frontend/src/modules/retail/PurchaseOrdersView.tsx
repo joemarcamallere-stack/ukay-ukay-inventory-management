@@ -17,7 +17,7 @@ import { retailQueryKeys } from '../lib/retailData';
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: 'Draft',
-  SUBMITTED: 'Submitted',
+  SUBMITTED: 'Pending Approval',
   APPROVED: 'Approved',
   PARTIALLY_RECEIVED: 'Partially Received',
   RECEIVED: 'Received',
@@ -67,6 +67,7 @@ export default function PurchaseOrdersView({
   const [selectedPOForAction, setSelectedPOForAction] = useState<string | null>(null);
   const [rejectionRemarks, setRejectionRemarks] = useState('');
   const [saving, setSaving] = useState(false);
+  const [processingApprovalId, setProcessingApprovalId] = useState<string | null>(null);
 
   const [poForm, setPOForm] = useState({
     supplierId: '' as string | undefined,
@@ -190,6 +191,7 @@ export default function PurchaseOrdersView({
   };
 
   const handleApprovePO = async (id: string) => {
+    setProcessingApprovalId(id);
     try {
       await approvePurchaseOrder(id);
       setSelectedPOForAction(null);
@@ -197,6 +199,8 @@ export default function PurchaseOrdersView({
       await loadData();
     } catch (err: any) {
       alert(err.message ?? 'Failed to approve purchase order');
+    } finally {
+      setProcessingApprovalId(null);
     }
   };
 
@@ -205,6 +209,7 @@ export default function PurchaseOrdersView({
       alert('Please provide remarks for rejection');
       return;
     }
+    setProcessingApprovalId(id);
     try {
       await rejectPurchaseOrder(id, rejectionRemarks);
       setRejectionRemarks('');
@@ -212,6 +217,8 @@ export default function PurchaseOrdersView({
       await loadData();
     } catch (err: any) {
       alert(err.message ?? 'Failed to reject purchase order');
+    } finally {
+      setProcessingApprovalId(null);
     }
   };
 
@@ -239,7 +246,7 @@ export default function PurchaseOrdersView({
 
   const stats = {
     total: orders.length,
-    pending: orders.filter(o => ['DRAFT', 'SUBMITTED'].includes(o.status)).length,
+    pendingApproval: submittedPOs.length,
     approved: orders.filter(o => o.status === 'APPROVED').length,
     received: orders.filter(o => o.status === 'RECEIVED').length,
   };
@@ -263,16 +270,18 @@ export default function PurchaseOrdersView({
             <Users className="size-4" />
             View Suppliers
           </button>
-          {isAdmin && submittedPOs.length > 0 && (
+          {isAdmin && (
             <button
               onClick={() => setShowPendingApprovalsModal(true)}
               className="bg-[#FFA500] text-white px-4 py-2 rounded-[8px] text-[14px] font-medium flex items-center gap-2 hover:bg-[#FF8C00] transition-colors relative"
             >
               <Clock className="size-4" />
               Pending Approvals
-              <span className="absolute -top-2 -right-2 bg-[#E7000B] text-white size-6 rounded-full flex items-center justify-center text-[12px] font-bold">
-                {submittedPOs.length}
-              </span>
+              {submittedPOs.length > 0 && (
+                <span className="absolute -top-2 -right-2 bg-[#E7000B] text-white size-6 rounded-full flex items-center justify-center text-[12px] font-bold">
+                  {submittedPOs.length}
+                </span>
+              )}
             </button>
           )}
           <button
@@ -580,7 +589,7 @@ export default function PurchaseOrdersView({
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="bg-white border border-[rgba(0,0,0,0.1)] rounded-[14px] p-4"><p className="text-[#323B42] text-[12px] mb-1">Total Orders</p><p className="text-[#323B42] text-[24px] font-bold">{stats.total}</p></div>
-        <div className="bg-white border border-[rgba(0,0,0,0.1)] rounded-[14px] p-4"><p className="text-[#323B42] text-[12px] mb-1">Pending</p><p className="text-[#FFA500] text-[24px] font-bold">{stats.pending}</p></div>
+        <div className="bg-white border border-[rgba(0,0,0,0.1)] rounded-[14px] p-4"><p className="text-[#323B42] text-[12px] mb-1">Pending Approval</p><p className="text-[#FFA500] text-[24px] font-bold">{stats.pendingApproval}</p></div>
         <div className="bg-white border border-[rgba(0,0,0,0.1)] rounded-[14px] p-4"><p className="text-[#323B42] text-[12px] mb-1">Approved</p><p className="text-[#007A5E] text-[24px] font-bold">{stats.approved}</p></div>
         <div className="bg-white border border-[rgba(0,0,0,0.1)] rounded-[14px] p-4"><p className="text-[#323B42] text-[12px] mb-1">Received</p><p className="text-[#008967] text-[24px] font-bold">{stats.received}</p></div>
       </div>
@@ -648,10 +657,10 @@ export default function PurchaseOrdersView({
               )}
               {order.status === 'SUBMITTED' && isAdmin && (
                 <>
-                  <button onClick={() => handleApprovePO(order.id)} className="px-4 py-1.5 bg-[#00A63E] text-white rounded-[6px] text-[13px] font-medium hover:bg-[#008F35] flex items-center gap-1">
-                    <CheckCircle className="size-3.5" /> Approve
+                  <button disabled={processingApprovalId !== null} onClick={() => handleApprovePO(order.id)} className="px-4 py-1.5 bg-[#00A63E] text-white rounded-[6px] text-[13px] font-medium hover:bg-[#008F35] flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed">
+                    <CheckCircle className="size-3.5" /> {processingApprovalId === order.id ? 'Approving...' : 'Approve'}
                   </button>
-                  <button onClick={() => setSelectedPOForAction(order.id)} className="px-4 py-1.5 border border-[#E7000B] text-[#E7000B] rounded-[6px] text-[13px] font-medium hover:bg-[#ffe2e2] flex items-center gap-1">
+                  <button disabled={processingApprovalId !== null} onClick={() => setSelectedPOForAction(order.id)} className="px-4 py-1.5 border border-[#E7000B] text-[#E7000B] rounded-[6px] text-[13px] font-medium hover:bg-[#ffe2e2] flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed">
                     <XCircle className="size-3.5" /> Reject
                   </button>
                 </>
@@ -669,7 +678,7 @@ export default function PurchaseOrdersView({
                 <label className="block text-[14px] font-medium text-[#323B42] mb-2">Rejection Remarks <span className="text-[#E7000B]">*</span></label>
                 <textarea value={rejectionRemarks} onChange={(e) => setRejectionRemarks(e.target.value)} placeholder="Provide reason for rejection..." className="w-full px-3 py-2 border border-[rgba(0,0,0,0.1)] rounded-[8px] text-[14px] focus:outline-none focus:border-[#007A5E] mb-3 resize-none" rows={2} />
                 <div className="flex gap-2">
-                  <button onClick={() => handleRejectPO(order.id)} className="flex-1 bg-[#E7000B] text-white px-4 py-2 rounded-[8px] text-[14px] font-medium hover:bg-[#D10000]">Confirm Rejection</button>
+                  <button disabled={processingApprovalId !== null} onClick={() => handleRejectPO(order.id)} className="flex-1 bg-[#E7000B] text-white px-4 py-2 rounded-[8px] text-[14px] font-medium hover:bg-[#D10000] disabled:opacity-60 disabled:cursor-not-allowed">{processingApprovalId === order.id ? 'Rejecting...' : 'Confirm Rejection'}</button>
                   <button onClick={() => { setSelectedPOForAction(null); setRejectionRemarks(''); }} className="flex-1 bg-[#F8FAFB] text-[#323B42] px-4 py-2 rounded-[8px] text-[14px] font-medium hover:bg-[#E5E7EB]">Cancel</button>
                 </div>
               </div>
@@ -703,7 +712,7 @@ export default function PurchaseOrdersView({
                       </div>
                       <div className="text-right">
                         <p className="text-[20px] font-bold text-[#007A5E]">₱{po.totalAmount.toLocaleString()}</p>
-                        <span className="px-2 py-1 rounded-full text-[11px] font-medium bg-[#fff4e6] text-[#FFA500]">Submitted</span>
+                        <span className="px-2 py-1 rounded-full text-[11px] font-medium bg-[#fff4e6] text-[#FFA500]">Pending Approval</span>
                       </div>
                     </div>
                     <div className="mb-3">
@@ -722,16 +731,16 @@ export default function PurchaseOrdersView({
                         <label className="block text-[14px] font-medium text-[#323B42] mb-2">Rejection Remarks <span className="text-[#E7000B]">*</span></label>
                         <textarea value={rejectionRemarks} onChange={(e) => setRejectionRemarks(e.target.value)} placeholder="Provide reason for rejection..." className="w-full px-3 py-2 border border-[rgba(0,0,0,0.1)] rounded-[8px] text-[14px] focus:outline-none focus:border-[#007A5E] mb-3 resize-none" rows={3} />
                         <div className="flex gap-2">
-                          <button onClick={() => handleRejectPO(po.id)} className="flex-1 bg-[#E7000B] text-white px-4 py-2 rounded-[8px] text-[14px] font-medium hover:bg-[#D10000]">Confirm Rejection</button>
-                          <button onClick={() => { setSelectedPOForAction(null); setRejectionRemarks(''); }} className="flex-1 bg-[#F8FAFB] text-[#323B42] px-4 py-2 rounded-[8px] text-[14px] font-medium hover:bg-[#E5E7EB]">Cancel</button>
+                          <button disabled={processingApprovalId !== null} onClick={() => handleRejectPO(po.id)} className="flex-1 bg-[#E7000B] text-white px-4 py-2 rounded-[8px] text-[14px] font-medium hover:bg-[#D10000] disabled:opacity-60 disabled:cursor-not-allowed">{processingApprovalId === po.id ? 'Rejecting...' : 'Confirm Rejection'}</button>
+                          <button disabled={processingApprovalId !== null} onClick={() => { setSelectedPOForAction(null); setRejectionRemarks(''); }} className="flex-1 bg-[#F8FAFB] text-[#323B42] px-4 py-2 rounded-[8px] text-[14px] font-medium hover:bg-[#E5E7EB] disabled:opacity-60 disabled:cursor-not-allowed">Cancel</button>
                         </div>
                       </div>
                     ) : (
                       <div className="flex gap-2 mt-3">
-                        <button onClick={() => handleApprovePO(po.id)} className="flex-1 bg-[#00A63E] text-white px-4 py-2 rounded-[8px] text-[14px] font-medium flex items-center justify-center gap-2 hover:bg-[#008F35]">
-                          <CheckCircle className="size-4" /> Approve
+                        <button disabled={processingApprovalId !== null} onClick={() => handleApprovePO(po.id)} className="flex-1 bg-[#00A63E] text-white px-4 py-2 rounded-[8px] text-[14px] font-medium flex items-center justify-center gap-2 hover:bg-[#008F35] disabled:opacity-60 disabled:cursor-not-allowed">
+                          <CheckCircle className="size-4" /> {processingApprovalId === po.id ? 'Approving...' : 'Approve'}
                         </button>
-                        <button onClick={() => setSelectedPOForAction(po.id)} className="flex-1 bg-white border border-[#E7000B] text-[#E7000B] px-4 py-2 rounded-[8px] text-[14px] font-medium flex items-center justify-center gap-2 hover:bg-[#ffe2e2]">
+                        <button disabled={processingApprovalId !== null} onClick={() => setSelectedPOForAction(po.id)} className="flex-1 bg-white border border-[#E7000B] text-[#E7000B] px-4 py-2 rounded-[8px] text-[14px] font-medium flex items-center justify-center gap-2 hover:bg-[#ffe2e2] disabled:opacity-60 disabled:cursor-not-allowed">
                           <XCircle className="size-4" /> Reject
                         </button>
                       </div>
