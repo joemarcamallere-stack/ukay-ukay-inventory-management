@@ -1,12 +1,24 @@
 import { useState, useMemo, useEffect } from 'react';
 import { LayoutDashboard, AlertTriangle, Package, ShoppingCart, PackageCheck, Layers, ArrowRightLeft, MapPin, FileText, Users, LogOut, Store, UtensilsCrossed } from 'lucide-react';
+import logoImage from '../imports/ims-logo.png';
 import LoginPage from './components/LoginPage';
 import TransfersView from '../modules/retail/TransfersView';
 import MultilocationView from '../modules/retail/MultilocationView';
 import PurchaseOrdersView from '../modules/retail/PurchaseOrdersView';
 import POSView from '../modules/retail/POSView';
 import { DashboardView, StockAlertsView, InventoryView, ProductsReceivedView, ItemBundlingView, ReportsView, UserManagementView } from '../modules/retail/RetailViews';
-import RestaurantShell from '../modules/restaurant/RestaurantShell';
+import { Dashboard as RestaurantDashboard } from '../modules/restaurant/Dashboard';
+import { StockControl as RestaurantStockControl } from '../modules/restaurant/StockControl';
+import { Inventory as RestaurantInventory } from '../modules/restaurant/Inventory';
+import { AddProduct as RestaurantAddProduct } from '../modules/restaurant/AddProduct';
+import { PurchaseOrders as RestaurantPurchaseOrders } from '../modules/restaurant/PurchaseOrders';
+import { GoodsReceived as RestaurantGoodsReceived } from '../modules/restaurant/GoodsReceived';
+import { POSKitchenOrders as RestaurantPOSKitchenOrders } from '../modules/restaurant/POSKitchenOrders';
+import { RecipeBOM as RestaurantRecipeBOM } from '../modules/restaurant/RecipeBOM';
+import { Transfers as RestaurantTransfers } from '../modules/restaurant/Transfers';
+import { Reports as RestaurantReports } from '../modules/restaurant/Reports';
+import { MultiLocation as RestaurantMultiLocation } from '../modules/restaurant/MultiLocation';
+import { RestaurantLayout } from '../modules/restaurant/RestaurantLayout';
 import {
   clearStoredToken,
   createInventoryItem,
@@ -111,21 +123,48 @@ export default function App() {
   const hasRetailModule = currentUser?.modules?.includes('RETAIL') ?? false;
   const hasBothModules = hasRestaurantModule && hasRetailModule;
   const [activeModule, setActiveModule] = useState<'RETAIL' | 'RESTAURANT'>('RETAIL');
+  const navigateToView = (view: ViewType, replace = false) => {
+    setCurrentView(view);
+    const url = new URL(window.location.href);
+    url.searchParams.set('view', view);
+    window.history[replace ? 'replaceState' : 'pushState']({ view }, '', url);
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const view = new URL(window.location.href).searchParams.get('view') as ViewType | null;
+      if (view) setCurrentView(view);
+    };
+    handlePopState();
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // When user logs in and has only RESTAURANT module, switch to it automatically
   useEffect(() => {
-    if (hasRestaurantModule && !hasRetailModule) {
+    if (hasRestaurantModule && currentView.startsWith('restaurant-')) {
+      setActiveModule('RESTAURANT');
+    } else if (hasRestaurantModule && !hasRetailModule) {
       setActiveModule('RESTAURANT');
     } else {
       setActiveModule('RETAIL');
     }
-  }, [hasRestaurantModule, hasRetailModule]);
+  }, [currentView, hasRestaurantModule, hasRetailModule]);
 
   // When switching modules, navigate to the appropriate default view
   const switchModule = (module: 'RETAIL' | 'RESTAURANT') => {
     setActiveModule(module);
-    setCurrentView(module === 'RESTAURANT' ? 'restaurant-dashboard' : 'dashboard');
+    navigateToView(module === 'RESTAURANT' ? 'restaurant-dashboard' : 'dashboard');
   };
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const view = (e as CustomEvent<string>).detail;
+      if (view) navigateToView(view as ViewType);
+    };
+    window.addEventListener('restaurant-navigate', handler);
+    return () => window.removeEventListener('restaurant-navigate', handler);
+  }, []);
 
   // Global handler to remove leading zeros from number inputs
   useEffect(() => {
@@ -399,6 +438,8 @@ export default function App() {
         businessId: response.user.businessId,
         modules: response.user.modules
       });
+      localStorage.setItem('userRole', response.user.role.toLowerCase());
+      localStorage.setItem('userEmail', response.user.email);
       setIsLoggedIn(true);
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Invalid credentials');
@@ -410,6 +451,8 @@ export default function App() {
     setIsLoggedIn(false);
     setCurrentUser(null);
     setCurrentView('dashboard');
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('userEmail');
   };
 
   if (!isLoggedIn) {
@@ -417,17 +460,53 @@ export default function App() {
   }
 
   if (activeModule === 'RESTAURANT' && hasRestaurantModule) {
+    const restaurantContent = (() => {
+      switch (currentView) {
+        case 'restaurant-dashboard':
+        case 'restaurant-ingredients':
+          return <RestaurantDashboard />;
+        case 'restaurant-stock-control':
+        case 'restaurant-spoilage':
+          return <RestaurantStockControl />;
+        case 'restaurant-food-inventory':
+        case 'restaurant-menu-items':
+          return <RestaurantInventory />;
+        case 'restaurant-add-food-item':
+          return <RestaurantAddProduct />;
+        case 'restaurant-purchase-orders':
+          return <RestaurantPurchaseOrders />;
+        case 'restaurant-goods-received':
+          return <RestaurantGoodsReceived />;
+        case 'restaurant-pos':
+        case 'restaurant-kitchen-orders':
+          return <RestaurantPOSKitchenOrders />;
+        case 'restaurant-recipe-bom':
+        case 'restaurant-recipes':
+          return <RestaurantRecipeBOM />;
+        case 'restaurant-transfers':
+          return <RestaurantTransfers />;
+        case 'restaurant-multilocation':
+          return <RestaurantMultiLocation />;
+        case 'restaurant-reports':
+          return <RestaurantReports />;
+        case 'user-management':
+          return <UserManagementView users={users} setUsers={setUsers} currentUser={currentUser} />;
+        default:
+          return <RestaurantDashboard />;
+      }
+    })();
+
     return (
-      <RestaurantShell
+      <RestaurantLayout
         currentView={currentView}
-        setCurrentView={setCurrentView}
-        currentUser={currentUser}
+        user={currentUser}
         hasBothModules={hasBothModules}
+        onNavigate={(view) => navigateToView(view as ViewType)}
         onSwitchToRetail={() => switchModule('RETAIL')}
         onLogout={handleLogout}
-        users={users}
-        setUsers={setUsers}
-      />
+      >
+        {restaurantContent}
+      </RestaurantLayout>
     );
   }
 
@@ -437,12 +516,12 @@ export default function App() {
       <div className="h-full w-[256px] flex flex-col" style={{ background: "#003534" }}>
         {/* Header */}
         <div className="p-6 flex items-center gap-3">
-          <div className="bg-white rounded-full size-[40px] flex items-center justify-center shadow-sm">
-            <Store className="size-6 text-[#007A5E]" strokeWidth={2.2} />
+          <div className="bg-white rounded-full size-[40px] flex items-center justify-center shadow-sm overflow-hidden">
+            <img src={logoImage} alt="IMS Logo" className="w-full h-full object-contain p-1" />
           </div>
           <div>
             <p className="text-white text-[20px] leading-[28px]" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700 }}>
-              CoCoders
+              Bukolabs.io
             </p>
             <p className="text-[#00A7A5] text-[12px] leading-[16px]" style={{ fontFamily: 'Inter, sans-serif' }}>Retail</p>
           </div>

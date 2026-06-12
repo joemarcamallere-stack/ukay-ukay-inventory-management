@@ -12,6 +12,7 @@ type CategoryItem = {
   price: number;
   expiry: string;
   location: string;
+  unit?: string;
 };
 
 export function CategoryDetail() {
@@ -78,6 +79,7 @@ export function CategoryDetail() {
         price: item.price,
         expiry: item.expiry,
         location: item.location || "Unassigned",
+        unit: item.unit || "pcs",
       };
     });
 

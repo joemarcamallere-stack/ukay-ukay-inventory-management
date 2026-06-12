@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Plus, Search, Edit, Trash2, Shield, Mail, Phone, MoreVertical, X, Save, AlertCircle } from "lucide-react";
-import { useLocalStorageState } from "../lib/localStorage";
+import { useRestaurantState } from "../lib/restaurantData";
 
 type User = {
   id: number;
@@ -28,7 +28,7 @@ export function UserManagement() {
     status: "active",
   });
 
-  const [users, setUsers] = useLocalStorageState<User[]>("users.records", []);
+  const [users, setUsers] = useRestaurantState<User[]>("users.records", []);
 
   const roles = ["all", "admin", "manager", "staff"];
 
@@ -366,7 +366,7 @@ export function UserManagement() {
                   type="email"
                   value={newUser.email}
                   onChange={handleInputChange}
-                  placeholder="e.g., john.smith@cocoders.com"
+                  placeholder="e.g., john.smith@bukolabs.io"
                   className="w-full px-4 py-3 text-sm bg-input-background border border-input rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
                   required
                 />
@@ -484,7 +484,7 @@ export function UserManagement() {
                   type="email"
                   value={newUser.email}
                   onChange={handleInputChange}
-                  placeholder="e.g., john.smith@cocoders.com"
+                  placeholder="e.g., john.smith@bukolabs.io"
                   className="w-full px-4 py-3 text-sm bg-input-background border border-input rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
                   required
                 />
