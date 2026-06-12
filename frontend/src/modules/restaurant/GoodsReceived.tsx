@@ -467,13 +467,13 @@ export function GoodsReceived() {
           },
         };
       }, {} as Record<InspectionCriterionKey, QualityCriterionScore>),
-      qualityStatus: decision === "reject"
+      qualityStatus: (decision === "reject"
         ? "rejected"
         : (Number(acceptedQuantities[index]) || 0) === 0
           ? "rejected"
           : (Number(acceptedQuantities[index]) || 0) < item.quantity
           ? "partial"
-            : "accepted",
+            : "accepted") as "accepted" | "partial" | "rejected",
     }));
     const payableTotal = decision === "reject" ? 0 : getPayableTotal(receivedItemsWithExpiry);
 

@@ -7,7 +7,7 @@ import { defaultInventoryProducts, getCategoryHierarchy, getStorageTemperatureOp
 type StoredProduct = {
   id: number;
   name: string;
-  itemType: string;
+  itemType?: string;
   sku: string;
   category: string;
   stock: number;

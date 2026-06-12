@@ -28,11 +28,12 @@ export interface PurchaseOrder {
   orderNumber: string;
   supplier: string;
   date: string;
-  status: 'Pending' | 'Approved' | 'Received' | 'Cancelled';
+  status: 'Pending' | 'Approved' | 'Received' | 'Cancelled' | 'Rejected';
   items: { name: string; quantity: number; price: number }[];
   totalAmount: number;
   paymentMethod?: 'Cash' | 'Bank Transfer' | 'Check' | 'Credit Terms';
   paymentTerms?: string;
+  createdBy?: string;
 }
 
 export interface Transfer {
@@ -393,7 +394,7 @@ export function generateSampleData(): InventoryItem[] {
       name,
       category: 'Shoes',
       
-      gender: 'Unisex',
+      targetCustomer: 'Unisex',
       subcategory: 'Sneakers',
       size: ['7', '8', '9', '10', '11'][Math.floor(Math.random() * 5)],
       condition: ['Excellent', 'Good', 'Fair'][Math.floor(Math.random() * 3)] as any,
@@ -415,7 +416,7 @@ export function generateSampleData(): InventoryItem[] {
       name,
       category: 'Shoes',
       
-      gender: 'Unisex',
+      targetCustomer: 'Unisex',
       subcategory: 'Boots',
       size: ['7', '8', '9', '10'][Math.floor(Math.random() * 4)],
       condition: ['Excellent', 'Good', 'Fair'][Math.floor(Math.random() * 3)] as any,
@@ -437,7 +438,7 @@ export function generateSampleData(): InventoryItem[] {
       name,
       category: 'Shoes',
       
-      gender: 'Unisex',
+      targetCustomer: 'Unisex',
       subcategory: 'Sandals',
       size: ['7', '8', '9', '10'][Math.floor(Math.random() * 4)],
       condition: ['Excellent', 'Good'][Math.floor(Math.random() * 2)] as any,
@@ -459,7 +460,7 @@ export function generateSampleData(): InventoryItem[] {
       name,
       category: 'Accessories',
       
-      gender: 'Unisex',
+      targetCustomer: 'Unisex',
       subcategory: 'Bags',
       size: 'One Size',
       condition: ['Excellent', 'Good', 'Fair'][Math.floor(Math.random() * 3)] as any,
@@ -480,7 +481,7 @@ export function generateSampleData(): InventoryItem[] {
       name,
       category: 'Accessories',
       
-      gender: 'Unisex',
+      targetCustomer: 'Unisex',
       subcategory: 'Hats',
       size: 'One Size',
       condition: ['Excellent', 'Good'][Math.floor(Math.random() * 2)] as any,
