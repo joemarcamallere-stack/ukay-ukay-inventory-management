@@ -16,8 +16,8 @@ import {
   Store,
   User as UserIcon,
   Users,
-  UtensilsCrossed,
 } from "lucide-react";
+import logoImage from "../../imports/ims-logo.png";
 import "./restaurantLegacyTheme.css";
 
 const navItems = [
@@ -72,11 +72,11 @@ export function RestaurantLayout({
       <aside className="w-64 bg-sidebar text-sidebar-foreground flex flex-col shadow-xl border-r border-sidebar-border">
         <div className="p-6 border-b border-sidebar-border">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-white shadow-lg flex-shrink-0 flex items-center justify-center">
-              <UtensilsCrossed className="w-7 h-7 text-primary" strokeWidth={2.2} />
+            <div className="w-12 h-12 rounded-full bg-white shadow-lg flex-shrink-0 overflow-hidden">
+              <img src={logoImage} alt="Bukolabs.io Logo" className="w-full h-full object-cover" />
             </div>
             <div>
-              <h1 className="text-xl font-bold" style={{ color: "#F8FAFB" }}>Cocoders</h1>
+              <h1 className="text-xl font-bold" style={{ color: "#F8FAFB" }}>Bukolabs.io</h1>
               <p className="text-xs text-sidebar-foreground/70">Restaurant</p>
             </div>
           </div>
